@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CityMap } from "@/components/city-map";
 import { AIPlanner } from "@/components/ai-planner";
 import { PanelHeader } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Ban, MoveRight, Wrench, Plus, Play, RotateCcw } from "lucide-react";
+import { createSimulation } from "@/lib/api/crud";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/simulator")({
   head: () => ({
