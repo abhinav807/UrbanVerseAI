@@ -180,13 +180,19 @@ export function MapboxMap({
         maxspeed: p.maxspeed,
       };
       onSelectionChange?.({ count: selectedRef.current.size, lastClicked: info });
-    });
+      });
+
+      cleanup = () => {
+        map.remove();
+        mapRef.current = null;
+        drawRef.current = null;
+        setReady(false);
+      };
+    })();
 
     return () => {
-      map.remove();
-      mapRef.current = null;
-      drawRef.current = null;
-      setReady(false);
+      cancelled = true;
+      cleanup?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
