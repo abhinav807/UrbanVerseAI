@@ -40,7 +40,7 @@ export function MapboxMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const drawRef = useRef<MapboxDraw | null>(null);
+  const drawRef = useRef<MapboxDrawType | null>(null);
   const selectedRef = useRef<Set<string | number>>(new Set());
   const [token, setToken] = useState<string>(() =>
     typeof window === "undefined" ? "" : localStorage.getItem(TOKEN_KEY) ?? "",
