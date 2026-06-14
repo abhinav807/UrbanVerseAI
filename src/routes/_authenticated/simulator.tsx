@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CityMap } from "@/components/city-map";
-import { AIPlanner } from "@/components/ai-planner";
+import { MapboxMap, MapDrawToolbar, type RoadFeatureInfo, type OverlayKind } from "@/components/mapbox-map";
 import { PanelHeader } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
-import { Ban, MoveRight, Wrench, Plus, Play, RotateCcw } from "lucide-react";
+import {
+  Ban, MoveRight, Wrench, Plus, Play, RotateCcw,
+  Activity, Flame, Droplets, EyeOff, MapPin,
+} from "lucide-react";
 import { createSimulation } from "@/lib/api/crud";
 import { toast } from "sonner";
 
@@ -13,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/simulator")({
   head: () => ({
     meta: [
       { title: "Simulator — UrbanVerse" },
-      { name: "description", content: "Run what-if scenarios on the city road network." },
+      { name: "description", content: "Run what-if scenarios on the real road network." },
     ],
   }),
   component: Simulator,
@@ -22,11 +24,27 @@ export const Route = createFileRoute("/_authenticated/simulator")({
 type Action = "block" | "extend" | "repair" | "build";
 
 function Simulator() {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [action, setAction] = useState<Action>("block");
+  const [overlay, setOverlay] = useState<OverlayKind>("traffic");
+  const [drawMode, setDrawMode] = useState<"none" | "road" | "route">("none");
+  const [selection, setSelection] = useState<{ count: number; lastClicked: RoadFeatureInfo | null }>({
+    count: 0,
+    lastClicked: null,
+  });
+  const [drawnFeatures, setDrawnFeatures] = useState<GeoJSON.Feature[]>([]);
   const [ran, setRan] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
   const queryClient = useQueryClient();
+
+  const n = selection.count;
+  const mult = { block: 1, extend: -0.6, repair: -0.3, build: -0.8 }[action];
+  const results = {
+    trafficDelta: n === 0 ? 0 : +(n * 4.2 * mult).toFixed(1),
+    congestionDelta: n === 0 ? 0 : +(n * 6.1 * mult).toFixed(1),
+    emergencyDelay: n === 0 ? 0 : +(n * 0.7 * Math.max(mult, 0.2)).toFixed(2),
+    population: n * 4180 + (action === "block" ? 2400 : 0),
+  };
 
   const runAndSave = async () => {
     setRan(true);
@@ -34,7 +52,12 @@ function Simulator() {
     try {
       await createSimulation({
         action,
-        result_json: { selectedIds: [...selected], ...results },
+        result_json: {
+          selectedCount: selection.count,
+          lastClicked: selection.lastClicked,
+          drawn: drawnFeatures,
+          ...results,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ["simulations"] });
       toast.success("Scenario saved to archive");
@@ -45,143 +68,131 @@ function Simulator() {
     }
   };
 
-
-  const toggle = (id: string) => {
-    setSelected((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+  const reset = () => {
+    setSelection({ count: 0, lastClicked: null });
+    setDrawnFeatures([]);
     setRan(false);
-  };
-
-  const reset = () => { setSelected(new Set()); setRan(false); };
-
-  // Deterministic mock results based on selection count + action
-  const n = selected.size;
-  const mult = { block: 1, extend: -0.6, repair: -0.3, build: -0.8 }[action];
-  const results = {
-    trafficDelta: n === 0 ? 0 : +(n * 4.2 * mult).toFixed(1),
-    congestionDelta: n === 0 ? 0 : +(n * 6.1 * mult).toFixed(1),
-    emergencyDelay: n === 0 ? 0 : +(n * 0.7 * Math.max(mult, 0.2)).toFixed(2),
-    population: n * 4180 + (action === "block" ? 2400 : 0),
+    setMapKey((k) => k + 1); // remount map to clear feature-state + drawings
   };
 
   return (
-    <div className="h-full flex">
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Action bar */}
-        <div className="border-b border-border bg-panel px-4 py-2.5 flex items-center gap-3">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Action
-          </div>
-          <div className="flex gap-1">
-            <ActionBtn icon={Ban} label="Block Road" active={action === "block"} onClick={() => setAction("block")} />
-            <ActionBtn icon={MoveRight} label="Extend Road" active={action === "extend"} onClick={() => setAction("extend")} />
-            <ActionBtn icon={Wrench} label="Repair Road" active={action === "repair"} onClick={() => setAction("repair")} />
-            <ActionBtn icon={Plus} label="Build New Road" active={action === "build"} onClick={() => setAction("build")} />
-          </div>
-          <div className="flex-1" />
-          <div className="text-mono text-xs text-muted-foreground">
-            <span className="text-foreground">{selected.size}</span> segments selected
-          </div>
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <RotateCcw className="size-3.5 mr-1.5" /> Reset
-          </Button>
-          <Button
-            size="sm"
-            disabled={selected.size === 0 || saving}
-            onClick={runAndSave}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Play className="size-3.5 mr-1.5" /> {saving ? "Saving…" : "Run Simulation"}
-          </Button>
+    <div className="h-full flex flex-col">
+      {/* Action bar */}
+      <div className="border-b border-border bg-panel px-4 py-2.5 flex items-center gap-3 flex-wrap">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Action</div>
+        <div className="flex gap-1">
+          <ActionBtn icon={Ban} label="Block Road" active={action === "block"} onClick={() => setAction("block")} />
+          <ActionBtn icon={MoveRight} label="Extend Road" active={action === "extend"} onClick={() => setAction("extend")} />
+          <ActionBtn icon={Wrench} label="Repair Road" active={action === "repair"} onClick={() => setAction("repair")} />
+          <ActionBtn icon={Plus} label="Build New Road" active={action === "build"} onClick={() => setAction("build")} />
         </div>
 
-        <div className="flex-1 grid grid-cols-3 gap-2 p-3 min-h-0">
-          <div className="col-span-2 panel-surface rounded-md overflow-hidden flex flex-col min-h-0">
-            <PanelHeader
-              subtitle="Scenario · S-2026-0418"
-              title="Network Editor"
-              right={
-                <span className="text-[10px] text-mono text-muted-foreground">
-                  Click highways & arterials to select
-                </span>
-              }
-            />
-            <div className="flex-1 min-h-0 relative">
-              <CityMap selectable selected={selected} onToggle={toggle} overlay="traffic" />
-            </div>
+        <div className="h-5 w-px bg-border mx-1" />
+
+        <MapDrawToolbar
+          mode={drawMode}
+          setMode={setDrawMode}
+          onClear={() => { setDrawnFeatures([]); setMapKey((k) => k + 1); }}
+        />
+
+        <div className="flex-1" />
+
+        <div className="text-mono text-xs text-muted-foreground">
+          <span className="text-foreground">{selection.count}</span> selected
+          {drawnFeatures.length > 0 && (
+            <> · <span className="text-foreground">{drawnFeatures.length}</span> drawn</>
+          )}
+        </div>
+        <Button variant="ghost" size="sm" onClick={reset}>
+          <RotateCcw className="size-3.5 mr-1.5" /> Reset
+        </Button>
+        <Button
+          size="sm"
+          disabled={(selection.count === 0 && drawnFeatures.length === 0) || saving}
+          onClick={runAndSave}
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <Play className="size-3.5 mr-1.5" /> {saving ? "Saving…" : "Run Simulation"}
+        </Button>
+      </div>
+
+      {/* Map (75%) + side panel (25%) */}
+      <div className="flex-1 flex min-h-0">
+        <div className="basis-3/4 grow-0 shrink-0 relative panel-surface m-3 mr-1.5 rounded-md overflow-hidden">
+          {/* Overlay toggles floating top-left */}
+          <div className="absolute z-10 top-3 left-3 panel-surface rounded-md p-1 flex gap-1 shadow-lg">
+            <OverlayBtn icon={EyeOff} label="None" active={overlay === "none"} onClick={() => setOverlay("none")} />
+            <OverlayBtn icon={Activity} label="Traffic" active={overlay === "traffic"} onClick={() => setOverlay("traffic")} />
+            <OverlayBtn icon={Flame} label="Heatmap" active={overlay === "heatmap"} onClick={() => setOverlay("heatmap")} />
+            <OverlayBtn icon={Droplets} label="Flood" active={overlay === "flood"} onClick={() => setOverlay("flood")} />
+          </div>
+
+          <MapboxMap
+            key={mapKey}
+            overlay={overlay}
+            drawMode={drawMode}
+            onSelectionChange={setSelection}
+            onDrawCreate={(f) => setDrawnFeatures((prev) => [...prev, f])}
+          />
+        </div>
+
+        <div className="basis-1/4 grow-0 shrink-0 flex flex-col gap-2 m-3 ml-1.5 min-h-0">
+          {/* Road details */}
+          <div className="panel-surface rounded-md flex flex-col overflow-hidden">
+            <PanelHeader subtitle="Inspector" title="Road Details" />
+            {selection.lastClicked ? (
+              <div className="p-3 space-y-2 text-xs">
+                <div className="flex items-start gap-2">
+                  <MapPin className="size-3.5 text-primary mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{selection.lastClicked.name}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                      {selection.lastClicked.class}
+                      {selection.lastClicked.type ? ` · ${selection.lastClicked.type}` : ""}
+                    </div>
+                  </div>
+                </div>
+                <DetailRow k="Segment ID" v={String(selection.lastClicked.id)} />
+                <DetailRow k="Lanes" v={selection.lastClicked.lanes ?? "—"} />
+                <DetailRow k="Max speed" v={selection.lastClicked.maxspeed ?? "—"} />
+                <DetailRow k="Surface" v={selection.lastClicked.surface ?? "—"} />
+              </div>
+            ) : (
+              <div className="p-4 text-xs text-muted-foreground">
+                Click any road on the map to inspect it. Click again to deselect. Use draw tools to add custom roads or proposed routes.
+              </div>
+            )}
           </div>
 
           {/* Results */}
-          <div className="panel-surface rounded-md flex flex-col overflow-hidden min-h-0">
+          <div className="panel-surface rounded-md flex flex-col overflow-hidden flex-1 min-h-0">
             <PanelHeader subtitle="Output" title="Simulation Results" />
             {!ran ? (
               <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-                <div className="size-12 rounded-full bg-accent/40 grid place-items-center mb-3">
-                  <Play className="size-5 text-muted-foreground" />
+                <div className="size-10 rounded-full bg-accent/40 grid place-items-center mb-2">
+                  <Play className="size-4 text-muted-foreground" />
                 </div>
-                <div className="text-sm font-medium">No active scenario</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Select road segments and run simulation to forecast network response.
+                <div className="text-xs font-medium">No active scenario</div>
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Select roads and run the simulation to forecast network response.
                 </div>
               </div>
             ) : (
-              <div className="p-3 space-y-3 overflow-y-auto">
-                <ResultRow
-                  label="Traffic flow"
-                  value={`${results.trafficDelta > 0 ? "+" : ""}${results.trafficDelta}%`}
-                  hint="Network-wide volume change"
-                  status={results.trafficDelta > 0 ? "danger" : "safe"}
-                />
-                <ResultRow
-                  label="Congestion"
-                  value={`${results.congestionDelta > 0 ? "+" : ""}${results.congestionDelta}%`}
-                  hint="Peak-hour bottleneck index"
-                  status={results.congestionDelta > 0 ? "warn" : "safe"}
-                />
-                <ResultRow
-                  label="Emergency response delay"
-                  value={`${results.emergencyDelay > 0 ? "+" : ""}${results.emergencyDelay} min`}
-                  hint="Avg time-to-scene · EMS/Fire"
-                  status={results.emergencyDelay > 0.5 ? "danger" : results.emergencyDelay > 0 ? "warn" : "safe"}
-                />
-                <ResultRow
-                  label="Population affected"
-                  value={results.population.toLocaleString()}
-                  hint="Residents in disruption radius"
-                  status="info"
-                />
-
-                <div className="border-t border-border pt-3 mt-3">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-                    Planner recommendation
-                  </div>
-                  <div className="text-xs leading-relaxed text-foreground/90">
-                    {action === "block"
-                      ? "Blocking these segments will reroute ~36% of traffic to parallel arterials. Consider staged closures during off-peak windows."
-                      : action === "extend"
-                        ? "Extension projected to absorb 12-18% overflow from adjacent corridors. ROI break-even in ~14 months."
-                        : action === "repair"
-                          ? "Repair pass restores 96% structural capacity. Schedule overnight to minimize disruption."
-                          : "New road segment improves connectivity for 4 sub-districts. Environmental review required."}
-                  </div>
-                </div>
+              <div className="p-3 space-y-2 overflow-y-auto">
+                <ResultRow label="Traffic" value={`${results.trafficDelta > 0 ? "+" : ""}${results.trafficDelta}%`} status={results.trafficDelta > 0 ? "danger" : "safe"} />
+                <ResultRow label="Congestion" value={`${results.congestionDelta > 0 ? "+" : ""}${results.congestionDelta}%`} status={results.congestionDelta > 0 ? "warn" : "safe"} />
+                <ResultRow label="Emergency delay" value={`${results.emergencyDelay > 0 ? "+" : ""}${results.emergencyDelay} min`} status={results.emergencyDelay > 0.5 ? "danger" : results.emergencyDelay > 0 ? "warn" : "safe"} />
+                <ResultRow label="Population affected" value={results.population.toLocaleString()} status="info" />
               </div>
             )}
           </div>
         </div>
       </div>
-
-      <AIPlanner />
     </div>
   );
 }
 
-function ActionBtn({
-  icon: Icon, label, active, onClick,
-}: { icon: any; label: string; active: boolean; onClick: () => void }) {
+function ActionBtn({ icon: Icon, label, active, onClick }: { icon: any; label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -197,9 +208,31 @@ function ActionBtn({
   );
 }
 
-function ResultRow({
-  label, value, hint, status,
-}: { label: string; value: string; hint: string; status: "safe" | "warn" | "danger" | "info" }) {
+function OverlayBtn({ icon: Icon, label, active, onClick }: { icon: any; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={
+        "flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded transition-colors " +
+        (active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent/40 hover:text-foreground")
+      }
+    >
+      <Icon className="size-3.5" /> {label}
+    </button>
+  );
+}
+
+function DetailRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between text-[11px] border-t border-border/60 pt-1.5">
+      <span className="text-muted-foreground">{k}</span>
+      <span className="text-mono text-foreground">{v}</span>
+    </div>
+  );
+}
+
+function ResultRow({ label, value, status }: { label: string; value: string; status: "safe" | "warn" | "danger" | "info" }) {
   const color = { safe: "text-safe", warn: "text-warn", danger: "text-danger", info: "text-info" }[status];
   return (
     <div className="border border-border rounded-md p-2.5 bg-background/40">
@@ -207,8 +240,7 @@ function ResultRow({
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
         <span className={`size-1.5 rounded-full bg-${status}`} />
       </div>
-      <div className={`text-mono text-xl mt-1 ${color}`}>{value}</div>
-      <div className="text-[11px] text-muted-foreground mt-0.5">{hint}</div>
+      <div className={`text-mono text-lg mt-0.5 ${color}`}>{value}</div>
     </div>
   );
 }
