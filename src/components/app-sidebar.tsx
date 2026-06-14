@@ -75,6 +75,12 @@ export function AppSidebar() {
           <div className="flex justify-between"><span>Uptime</span><span>99.982%</span></div>
           <div className="flex justify-between"><span>Region</span><span>NA-EAST-1</span></div>
         </div>
+        <button
+          onClick={signOut}
+          className="w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+        >
+          <LogOut className="size-3.5" /> Sign out
+        </button>
       </div>
     </aside>
   );
