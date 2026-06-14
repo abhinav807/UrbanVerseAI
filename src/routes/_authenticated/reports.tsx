@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { PanelHeader } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Sparkles } from "lucide-react";
+import { Download, FileText, Sparkles, Loader2 } from "lucide-react";
+import { simulationsApi, type Simulation } from "@/lib/api/crud";
+import { toast } from "sonner";
 
-export const Route = createFileRoute("/reports")({
+export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
     meta: [
       { title: "Reports — UrbanVerse" },
@@ -28,6 +31,29 @@ const recs = [
 ];
 
 function Reports() {
+  const { data: live = [], isLoading } = useQuery({
+    queryKey: ["simulations"],
+    queryFn: () => simulationsApi.list(),
+  });
+
+  const liveRows = live.map((s: Simulation) => {
+    const r = (s.result_json ?? {}) as Record<string, any>;
+    const impact = typeof r.trafficDelta === "number"
+      ? `${r.trafficDelta > 0 ? "+" : ""}${r.trafficDelta}% traffic`
+      : "—";
+    return {
+      id: `S-${s.id.slice(0, 8).toUpperCase()}`,
+      title: `${s.action.charAt(0).toUpperCase() + s.action.slice(1)} scenario`,
+      date: new Date(s.created_at).toISOString().slice(0, 10),
+      author: "You",
+      impact,
+      status: "Draft" as const,
+      _live: true as const,
+    };
+  });
+
+  const allRows = [...liveRows, ...reports];
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-5 max-w-[1400px] mx-auto space-y-5">
@@ -86,7 +112,7 @@ function Reports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {reports.map((r) => (
+                {allRows.map((r) => (
                   <tr key={r.id} className="hover:bg-accent/30">
                     <td className="py-2.5 px-3 text-mono text-xs text-muted-foreground">{r.id}</td>
                     <td className="py-2.5 px-3">

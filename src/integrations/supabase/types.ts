@@ -14,7 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          report_text: string
+          simulation_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          report_text?: string
+          simulation_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          report_text?: string
+          simulation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "simulations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_zones: {
+        Row: {
+          created_at: string
+          geometry: Json
+          id: string
+          risk_level: string
+          risk_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          geometry?: Json
+          id?: string
+          risk_level?: string
+          risk_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          geometry?: Json
+          id?: string
+          risk_level?: string
+          risk_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      roads: {
+        Row: {
+          capacity: number
+          condition: string
+          created_at: string
+          geometry: Json
+          id: string
+          name: string
+          traffic: number
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number
+          condition?: string
+          created_at?: string
+          geometry?: Json
+          id?: string
+          name: string
+          traffic?: number
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          condition?: string
+          created_at?: string
+          geometry?: Json
+          id?: string
+          name?: string
+          traffic?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      simulations: {
+        Row: {
+          action: string
+          created_at: string
+          created_by: string | null
+          id: string
+          result_json: Json
+          road_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          result_json?: Json
+          road_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          result_json?: Json
+          road_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulations_road_id_fkey"
+            columns: ["road_id"]
+            isOneToOne: false
+            referencedRelation: "roads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
