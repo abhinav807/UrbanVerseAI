@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import MapboxDraw from "@mapbox/mapbox-gl-draw";
+import type mapboxgl from "mapbox-gl";
+import type MapboxDrawType from "@mapbox/mapbox-gl-draw";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import { Button } from "@/components/ui/button";
