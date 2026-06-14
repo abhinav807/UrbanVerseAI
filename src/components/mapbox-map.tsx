@@ -32,7 +32,7 @@ const TOKEN_KEY = "urbanverse.mapbox_token";
 
 export function MapboxMap({
   overlay = "none",
-  onSelectRoad,
+  onSelectionChange,
   drawMode = "none",
   onDrawCreate,
   center = [-74.006, 40.7128],
