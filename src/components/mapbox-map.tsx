@@ -148,7 +148,7 @@ export function MapboxMap({
           ),
         );
         selectedRef.current.clear();
-        onSelectRoad?.(null);
+        onSelectionChange?.({ count: 0, lastClicked: null });
         return;
       }
       const f = feats[0];
@@ -162,7 +162,7 @@ export function MapboxMap({
       else selectedRef.current.add(id);
 
       const p = f.properties ?? {};
-      onSelectRoad?.({
+      const info: RoadFeatureInfo = {
         id,
         name: p.name ?? "Unnamed segment",
         class: p.class ?? "road",
@@ -170,7 +170,8 @@ export function MapboxMap({
         surface: p.surface,
         lanes: p.lanes,
         maxspeed: p.maxspeed,
-      });
+      };
+      onSelectionChange?.({ count: selectedRef.current.size, lastClicked: info });
     });
 
     return () => {
