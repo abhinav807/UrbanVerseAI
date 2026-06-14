@@ -51,29 +51,37 @@ export function MapboxMap({
   // Init map
   useEffect(() => {
     if (!token || !containerRef.current || mapRef.current) return;
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center,
-      zoom,
-      attributionControl: false,
-    });
-    mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }));
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      const [{ default: mapboxgl }, { default: MapboxDraw }] = await Promise.all([
+        import("mapbox-gl"),
+        import("@mapbox/mapbox-gl-draw"),
+      ]);
+      if (cancelled || !containerRef.current) return;
+      mapboxgl.accessToken = token;
+      const map = new mapboxgl.Map({
+        container: containerRef.current,
+        style: "mapbox://styles/mapbox/dark-v11",
+        center,
+        zoom,
+        attributionControl: false,
+      });
+      mapRef.current = map;
+      map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
+      map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
-    const draw = new MapboxDraw({
-      displayControlsDefault: false,
-      controls: {},
-      styles: drawStyles,
-    });
-    drawRef.current = draw;
-    map.addControl(draw as unknown as mapboxgl.IControl);
+      const draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: {},
+        styles: drawStyles,
+      });
+      drawRef.current = draw;
+      map.addControl(draw as unknown as mapboxgl.IControl);
 
-    map.on("draw.create", (e: { features: GeoJSON.Feature[] }) => {
-      e.features.forEach((f) => onDrawCreate?.(f));
-    });
+      map.on("draw.create", (e: { features: GeoJSON.Feature[] }) => {
+        e.features.forEach((f) => onDrawCreate?.(f));
+      });
 
     map.on("load", () => {
       // Highlight layer for selected road segments (uses feature-state)
