@@ -25,6 +25,26 @@ function Simulator() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [action, setAction] = useState<Action>("block");
   const [ran, setRan] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+
+  const runAndSave = async () => {
+    setRan(true);
+    setSaving(true);
+    try {
+      await createSimulation({
+        action,
+        result_json: { selectedIds: [...selected], ...results },
+      });
+      queryClient.invalidateQueries({ queryKey: ["simulations"] });
+      toast.success("Scenario saved to archive");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to save scenario");
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   const toggle = (id: string) => {
     setSelected((s) => {
@@ -70,11 +90,11 @@ function Simulator() {
           </Button>
           <Button
             size="sm"
-            disabled={selected.size === 0}
-            onClick={() => setRan(true)}
+            disabled={selected.size === 0 || saving}
+            onClick={runAndSave}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            <Play className="size-3.5 mr-1.5" /> Run Simulation
+            <Play className="size-3.5 mr-1.5" /> {saving ? "Saving…" : "Run Simulation"}
           </Button>
         </div>
 
