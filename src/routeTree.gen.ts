@@ -9,129 +9,140 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VulnerabilityRouteImport } from './routes/vulnerability'
-import { Route as SimulatorRouteImport } from './routes/simulator'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedVulnerabilityRouteImport } from './routes/_authenticated/vulnerability'
+import { Route as AuthenticatedSimulatorRouteImport } from './routes/_authenticated/simulator'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 
-const VulnerabilityRoute = VulnerabilityRouteImport.update({
-  id: '/vulnerability',
-  path: '/vulnerability',
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/_authenticated/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SimulatorRoute = SimulatorRouteImport.update({
-  id: '/simulator',
+const AuthenticatedVulnerabilityRoute =
+  AuthenticatedVulnerabilityRouteImport.update({
+    id: '/_authenticated/vulnerability',
+    path: '/vulnerability',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedSimulatorRoute = AuthenticatedSimulatorRouteImport.update({
+  id: '/_authenticated/simulator',
   path: '/simulator',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/_authenticated/settings',
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/_authenticated/reports',
   path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/reports': typeof ReportsRoute
-  '/settings': typeof SettingsRoute
-  '/simulator': typeof SimulatorRoute
-  '/vulnerability': typeof VulnerabilityRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/simulator': typeof AuthenticatedSimulatorRoute
+  '/vulnerability': typeof AuthenticatedVulnerabilityRoute
+  '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/reports': typeof ReportsRoute
-  '/settings': typeof SettingsRoute
-  '/simulator': typeof SimulatorRoute
-  '/vulnerability': typeof VulnerabilityRoute
+  '/reports': typeof AuthenticatedReportsRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/simulator': typeof AuthenticatedSimulatorRoute
+  '/vulnerability': typeof AuthenticatedVulnerabilityRoute
+  '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/reports': typeof ReportsRoute
-  '/settings': typeof SettingsRoute
-  '/simulator': typeof SimulatorRoute
-  '/vulnerability': typeof VulnerabilityRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/simulator': typeof AuthenticatedSimulatorRoute
+  '/_authenticated/vulnerability': typeof AuthenticatedVulnerabilityRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/reports' | '/settings' | '/simulator' | '/vulnerability'
+  fullPaths: '/reports' | '/settings' | '/simulator' | '/vulnerability' | '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/reports' | '/settings' | '/simulator' | '/vulnerability'
+  to: '/reports' | '/settings' | '/simulator' | '/vulnerability' | '/'
   id:
     | '__root__'
-    | '/'
-    | '/reports'
-    | '/settings'
-    | '/simulator'
-    | '/vulnerability'
+    | '/_authenticated/reports'
+    | '/_authenticated/settings'
+    | '/_authenticated/simulator'
+    | '/_authenticated/vulnerability'
+    | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ReportsRoute: typeof ReportsRoute
-  SettingsRoute: typeof SettingsRoute
-  SimulatorRoute: typeof SimulatorRoute
-  VulnerabilityRoute: typeof VulnerabilityRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSimulatorRoute: typeof AuthenticatedSimulatorRoute
+  AuthenticatedVulnerabilityRoute: typeof AuthenticatedVulnerabilityRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vulnerability': {
-      id: '/vulnerability'
-      path: '/vulnerability'
-      fullPath: '/vulnerability'
-      preLoaderRoute: typeof VulnerabilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/simulator': {
-      id: '/simulator'
-      path: '/simulator'
-      fullPath: '/simulator'
-      preLoaderRoute: typeof SimulatorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
+    '/_authenticated/': {
+      id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/vulnerability': {
+      id: '/_authenticated/vulnerability'
+      path: '/vulnerability'
+      fullPath: '/vulnerability'
+      preLoaderRoute: typeof AuthenticatedVulnerabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/simulator': {
+      id: '/_authenticated/simulator'
+      path: '/simulator'
+      fullPath: '/simulator'
+      preLoaderRoute: typeof AuthenticatedSimulatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ReportsRoute: ReportsRoute,
-  SettingsRoute: SettingsRoute,
-  SimulatorRoute: SimulatorRoute,
-  VulnerabilityRoute: VulnerabilityRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSimulatorRoute: AuthenticatedSimulatorRoute,
+  AuthenticatedVulnerabilityRoute: AuthenticatedVulnerabilityRoute,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

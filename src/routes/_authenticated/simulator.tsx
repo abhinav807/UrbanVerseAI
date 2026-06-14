@@ -6,7 +6,7 @@ import { PanelHeader } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Ban, MoveRight, Wrench, Plus, Play, RotateCcw } from "lucide-react";
 
-export const Route = createFileRoute("/simulator")({
+export const Route = createFileRoute("/_authenticated/simulator")({
   head: () => ({
     meta: [
       { title: "Simulator — UrbanVerse" },

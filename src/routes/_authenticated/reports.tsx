@@ -3,7 +3,7 @@ import { PanelHeader } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Download, FileText, Sparkles } from "lucide-react";
 
-export const Route = createFileRoute("/reports")({
+export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
     meta: [
       { title: "Reports — UrbanVerse" },
