@@ -21,7 +21,7 @@ export interface RoadFeatureInfo {
 
 interface Props {
   overlay?: OverlayKind;
-  onSelectRoad?: (info: RoadFeatureInfo | null) => void;
+  onSelectionChange?: (s: { count: number; lastClicked: RoadFeatureInfo | null }) => void;
   drawMode?: "none" | "road" | "route";
   onDrawCreate?: (geojson: GeoJSON.Feature) => void;
   center?: [number, number];
