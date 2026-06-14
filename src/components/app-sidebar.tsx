@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   FlaskConical,
@@ -6,8 +6,11 @@ import {
   FileBarChart,
   Settings,
   Activity,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const items = [
   { title: "Dashboard", to: "/", icon: LayoutDashboard },
