@@ -142,18 +142,35 @@ function TopBar() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthRoute = pathname === "/auth";
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+      router.invalidate();
+      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen w-full overflow-hidden">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <TopBar />
-          <main className="flex-1 overflow-hidden">
-            <Outlet />
-          </main>
+      {isAuthRoute ? (
+        <Outlet />
+      ) : (
+        <div className="flex h-screen w-full overflow-hidden">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col min-w-0">
+            <TopBar />
+            <main className="flex-1 overflow-hidden">
+              <Outlet />
+            </main>
+          </div>
         </div>
-      </div>
+      )}
+      <Toaster theme="dark" position="bottom-right" />
     </QueryClientProvider>
   );
 }
