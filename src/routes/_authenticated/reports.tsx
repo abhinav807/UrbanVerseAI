@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { PanelHeader } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Sparkles } from "lucide-react";
+import { Download, FileText, Sparkles, Loader2 } from "lucide-react";
+import { simulationsApi, type Simulation } from "@/lib/api/crud";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
