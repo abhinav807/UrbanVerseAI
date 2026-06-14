@@ -3,7 +3,7 @@ import { CityMap } from "@/components/city-map";
 import { AIPlanner } from "@/components/ai-planner";
 import { KpiCard, PanelHeader } from "@/components/kpi-card";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Dashboard — UrbanVerse" },
