@@ -2,6 +2,8 @@
 @source "../src";
 @import "tw-animate-css";
 
+@source inline("bg-safe bg-warn bg-danger bg-info text-safe text-warn text-danger text-info shadow-safe shadow-warn shadow-danger border-safe/30 border-warn/30 border-danger/30 bg-safe/15 bg-warn/15 bg-danger/15");
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
