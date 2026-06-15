@@ -2,6 +2,7 @@
 // Filename kept for backward compatibility — exports MapboxMap/MapDrawToolbar names.
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import type * as GJ from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Pencil, Route as RouteIcon, Trash2 } from "lucide-react";
 
