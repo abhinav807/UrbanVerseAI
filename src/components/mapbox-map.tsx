@@ -67,6 +67,14 @@ export function MapboxMap({
         attributionControl: false,
       });
       mapRef.current = map;
+
+      // Force resize once container is laid out / when it changes size.
+      const ro = new ResizeObserver(() => {
+        try { map.resize(); } catch { /* noop */ }
+      });
+      ro.observe(containerRef.current);
+      requestAnimationFrame(() => { try { map.resize(); } catch { /* noop */ } });
+
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
       map.addControl(
         new maplibregl.AttributionControl({
