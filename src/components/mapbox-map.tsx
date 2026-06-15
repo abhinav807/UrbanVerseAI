@@ -21,7 +21,7 @@ interface Props {
   overlay?: OverlayKind;
   onSelectionChange?: (s: { count: number; lastClicked: RoadFeatureInfo | null }) => void;
   drawMode?: "none" | "road" | "route";
-  onDrawCreate?: (geojson: GeoJSON.Feature) => void;
+  onDrawCreate?: (geojson: GJ.Feature) => void;
   center?: [number, number];
   zoom?: number;
 }
@@ -32,7 +32,7 @@ const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 const ROAD_SOURCE = "openmaptiles";
 const ROAD_SOURCE_LAYER = "transportation";
 
-const emptyFC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+const emptyFC: GJ.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 export function MapboxMap({
   overlay = "none",
@@ -44,7 +44,7 @@ export function MapboxMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
-  const selectedRef = useRef<Map<string, GeoJSON.Feature>>(new Map());
+  const selectedRef = useRef<Map<string, GJ.Feature>>(new Map());
   const drawCoordsRef = useRef<[number, number][]>([]);
   const drawModeRef = useRef(drawMode);
   const [ready, setReady] = useState(false);
@@ -224,15 +224,15 @@ export function MapboxMap({
           drawCoordsRef.current = [];
           return;
         }
-        const feature: GeoJSON.Feature = {
+        const feature: GJ.Feature = {
           type: "Feature",
           geometry: { type: "LineString", coordinates: coords },
           properties: { kind: drawModeRef.current },
         };
         const linesSrc = map.getSource("uv-draw-lines") as maplibregl.GeoJSONSource;
         // append by reading current; we don't keep state — emit out and let parent re-mount if needed
-        const current = (linesSrc as any)._data as GeoJSON.FeatureCollection | undefined;
-        const next: GeoJSON.FeatureCollection = {
+        const current = (linesSrc as any)._data as GJ.FeatureCollection | undefined;
+        const next: GJ.FeatureCollection = {
           type: "FeatureCollection",
           features: [...(current?.features ?? []), feature],
         };
@@ -430,8 +430,8 @@ function randomPoints(
   [lng, lat]: [number, number],
   count: number,
   spread: number,
-): GeoJSON.FeatureCollection {
-  const features: GeoJSON.Feature[] = [];
+): GJ.FeatureCollection {
+  const features: GJ.Feature[] = [];
   for (let i = 0; i < count; i++) {
     const dx = (Math.random() - 0.5 + (Math.random() - 0.5)) * spread;
     const dy = (Math.random() - 0.5 + (Math.random() - 0.5)) * spread;
@@ -444,7 +444,7 @@ function randomPoints(
   return { type: "FeatureCollection", features };
 }
 
-function floodPolygons([lng, lat]: [number, number]): GeoJSON.FeatureCollection {
+function floodPolygons([lng, lat]: [number, number]): GJ.FeatureCollection {
   const make = (cx: number, cy: number, r: number, risk: string) => {
     const pts: [number, number][] = [];
     const sides = 14;
