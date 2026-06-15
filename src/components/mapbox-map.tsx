@@ -59,10 +59,6 @@ export function MapboxMap({
     (async () => {
       const maplibregl = (await import("maplibre-gl")).default;
       if (cancelled || !containerRef.current) return;
-      console.log("[uv-map] init", {
-        w: containerRef.current.clientWidth,
-        h: containerRef.current.clientHeight,
-      });
 
       const map = new maplibregl.Map({
         container: containerRef.current,
@@ -72,15 +68,8 @@ export function MapboxMap({
         attributionControl: false,
       });
       mapRef.current = map;
-      (window as any).__uvmap = map;
 
-      map.on("error", (e) => console.error("[uv-map] error", e?.error ?? e));
-      map.on("load", () => console.log("[uv-map] style loaded"));
-      map.on("data", (e: any) => {
-        if (e.dataType === "source" && e.tile) {
-          // tile event — useful to see whether tiles are being requested
-        }
-      });
+      map.on("error", (e) => console.warn("[uv-map]", e?.error ?? e));
 
       // Force resize once container is laid out / when it changes size.
       const ro = new ResizeObserver(() => {
@@ -88,6 +77,7 @@ export function MapboxMap({
       });
       ro.observe(containerRef.current);
       requestAnimationFrame(() => { try { map.resize(); } catch { /* noop */ } });
+
 
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
       map.addControl(
