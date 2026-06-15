@@ -1,11 +1,9 @@
+// MapLibre GL + OpenStreetMap-based implementation.
+// Filename kept for backward compatibility — exports MapboxMap/MapDrawToolbar names.
 import { useEffect, useRef, useState } from "react";
-import type mapboxgl from "mapbox-gl";
-import type MapboxDrawType from "@mapbox/mapbox-gl-draw";
-import "mapbox-gl/dist/mapbox-gl.css";
-import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Pencil, Route as RouteIcon, Trash2, KeyRound } from "lucide-react";
+import type { Map as MlMap, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { Pencil, Route as RouteIcon, Trash2 } from "lucide-react";
 
 export type OverlayKind = "none" | "traffic" | "heatmap" | "flood";
 
@@ -28,7 +26,13 @@ interface Props {
   zoom?: number;
 }
 
-const TOKEN_KEY = "urbanverse.mapbox_token";
+// OpenFreeMap — free, no-API-key vector tiles based on OpenStreetMap (OpenMapTiles schema).
+// Roads live in source-layer "transportation".
+const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
+const ROAD_SOURCE = "openmaptiles";
+const ROAD_SOURCE_LAYER = "transportation";
+
+const emptyFC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 export function MapboxMap({
   overlay = "none",
@@ -39,153 +43,201 @@ export function MapboxMap({
   zoom = 12.2,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const drawRef = useRef<MapboxDrawType | null>(null);
-  const selectedRef = useRef<Set<string | number>>(new Set());
-  const [token, setToken] = useState<string>(() =>
-    typeof window === "undefined" ? "" : localStorage.getItem(TOKEN_KEY) ?? "",
-  );
-  const [tokenInput, setTokenInput] = useState("");
+  const mapRef = useRef<MlMap | null>(null);
+  const selectedRef = useRef<Map<string, GeoJSON.Feature>>(new Map());
+  const drawCoordsRef = useRef<[number, number][]>([]);
+  const drawModeRef = useRef(drawMode);
   const [ready, setReady] = useState(false);
 
   // Init map
   useEffect(() => {
-    if (!token || !containerRef.current || mapRef.current) return;
+    if (!containerRef.current || mapRef.current) return;
     let cancelled = false;
     let cleanup: (() => void) | undefined;
+
     (async () => {
-      const [{ default: mapboxgl }, { default: MapboxDraw }] = await Promise.all([
-        import("mapbox-gl"),
-        import("@mapbox/mapbox-gl-draw"),
-      ]);
+      const maplibregl = (await import("maplibre-gl")).default;
       if (cancelled || !containerRef.current) return;
-      mapboxgl.accessToken = token;
-      const map = new mapboxgl.Map({
+
+      const map = new maplibregl.Map({
         container: containerRef.current,
-        style: "mapbox://styles/mapbox/dark-v11",
+        style: STYLE_URL,
         center,
         zoom,
         attributionControl: false,
       });
       mapRef.current = map;
-      map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
-      map.addControl(new mapboxgl.AttributionControl({ compact: true }));
-
-      const draw = new MapboxDraw({
-        displayControlsDefault: false,
-        controls: {},
-        styles: drawStyles,
-      });
-      drawRef.current = draw;
-      map.addControl(draw as unknown as mapboxgl.IControl);
-
-      map.on("draw.create", (e: { features: GeoJSON.Feature[] }) => {
-        e.features.forEach((f) => onDrawCreate?.(f));
-      });
-
-    map.on("load", () => {
-      // Highlight layer for selected road segments (uses feature-state)
-      map.addLayer({
-        id: "uv-road-highlight",
-        type: "line",
-        source: "composite",
-        "source-layer": "road",
-        paint: {
-          "line-color": "#ef4444",
-          "line-width": [
-            "interpolate", ["linear"], ["zoom"],
-            10, 2, 14, 5, 18, 10,
-          ],
-          "line-opacity": [
-            "case",
-            ["boolean", ["feature-state", "selected"], false], 0.95, 0,
-          ],
-        },
-      });
-
-      // Hover layer
-      map.addLayer({
-        id: "uv-road-hover",
-        type: "line",
-        source: "composite",
-        "source-layer": "road",
-        paint: {
-          "line-color": "#fbbf24",
-          "line-width": 3,
-          "line-opacity": [
-            "case",
-            ["boolean", ["feature-state", "hover"], false], 0.6, 0,
-          ],
-        },
-      });
-
-      setReady(true);
-    });
-
-    let hovered: { id: string | number; source: string; sourceLayer: string } | null = null;
-
-    map.on("mousemove", (e) => {
-      const feats = map.queryRenderedFeatures(e.point, {
-        layers: ["uv-road-hover"],
-      });
-      if (hovered) {
-        map.setFeatureState(hovered, { hover: false });
-        hovered = null;
-      }
-      if (feats.length && feats[0].id != null) {
-        const f = feats[0];
-        hovered = { id: f.id!, source: "composite", sourceLayer: "road" };
-        map.setFeatureState(hovered, { hover: true });
-        map.getCanvas().style.cursor = "pointer";
-      } else {
-        map.getCanvas().style.cursor = "";
-      }
-    });
-
-    map.on("click", (e) => {
-      if (drawModeRef.current !== "none") return;
-      const feats = map.queryRenderedFeatures(e.point, {
-        layers: ["uv-road-highlight"],
-      });
-      if (!feats.length || feats[0].id == null) {
-        // clear
-        selectedRef.current.forEach((id) =>
-          map.setFeatureState(
-            { id, source: "composite", sourceLayer: "road" },
-            { selected: false },
-          ),
-        );
-        selectedRef.current.clear();
-        onSelectionChange?.({ count: 0, lastClicked: null });
-        return;
-      }
-      const f = feats[0];
-      const id = f.id!;
-      const isSel = selectedRef.current.has(id);
-      map.setFeatureState(
-        { id, source: "composite", sourceLayer: "road" },
-        { selected: !isSel },
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+      map.addControl(
+        new maplibregl.AttributionControl({
+          compact: true,
+          customAttribution: "© OpenStreetMap contributors · OpenFreeMap",
+        }),
       );
-      if (isSel) selectedRef.current.delete(id);
-      else selectedRef.current.add(id);
 
-      const p = f.properties ?? {};
-      const info: RoadFeatureInfo = {
-        id,
-        name: p.name ?? "Unnamed segment",
-        class: p.class ?? "road",
-        type: p.type,
-        surface: p.surface,
-        lanes: p.lanes,
-        maxspeed: p.maxspeed,
-      };
-      onSelectionChange?.({ count: selectedRef.current.size, lastClicked: info });
+      map.on("load", () => {
+        // Sources for selection/hover/draw highlight (GeoJSON because OMT tiles lack stable ids)
+        map.addSource("uv-selected-roads", { type: "geojson", data: emptyFC });
+        map.addSource("uv-hover-road", { type: "geojson", data: emptyFC });
+        map.addSource("uv-draw-lines", { type: "geojson", data: emptyFC });
+        map.addSource("uv-draw-progress", { type: "geojson", data: emptyFC });
+        map.addSource("uv-draw-vertices", { type: "geojson", data: emptyFC });
+
+        map.addLayer({
+          id: "uv-road-hover",
+          type: "line",
+          source: "uv-hover-road",
+          paint: {
+            "line-color": "#fbbf24",
+            "line-width": 3,
+            "line-opacity": 0.6,
+          },
+        });
+        map.addLayer({
+          id: "uv-road-highlight",
+          type: "line",
+          source: "uv-selected-roads",
+          paint: {
+            "line-color": "#ef4444",
+            "line-width": [
+              "interpolate", ["linear"], ["zoom"],
+              10, 2, 14, 5, 18, 10,
+            ],
+            "line-opacity": 0.95,
+          },
+        });
+
+        // Draw layers
+        map.addLayer({
+          id: "uv-draw-lines",
+          type: "line",
+          source: "uv-draw-lines",
+          paint: {
+            "line-color": ["case", ["==", ["get", "kind"], "route"], "#22d3ee", "#3b82f6"],
+            "line-width": 3,
+            "line-dasharray": [2, 1],
+          },
+        });
+        map.addLayer({
+          id: "uv-draw-progress",
+          type: "line",
+          source: "uv-draw-progress",
+          paint: { "line-color": "#3b82f6", "line-width": 2, "line-dasharray": [1, 1] },
+        });
+        map.addLayer({
+          id: "uv-draw-vertices",
+          type: "circle",
+          source: "uv-draw-vertices",
+          paint: { "circle-radius": 4, "circle-color": "#3b82f6", "circle-stroke-color": "#fff", "circle-stroke-width": 1 },
+        });
+
+        setReady(true);
+      });
+
+      // Hover
+      map.on("mousemove", (e) => {
+        if (drawModeRef.current !== "none") {
+          // show in-progress line to cursor
+          const coords = drawCoordsRef.current;
+          if (coords.length > 0) {
+            const src = map.getSource("uv-draw-progress") as maplibregl.GeoJSONSource;
+            src?.setData({
+              type: "FeatureCollection",
+              features: [{
+                type: "Feature",
+                geometry: { type: "LineString", coordinates: [...coords, [e.lngLat.lng, e.lngLat.lat]] },
+                properties: {},
+              }],
+            });
+          }
+          map.getCanvas().style.cursor = "crosshair";
+          return;
+        }
+        const feats = roadFeaturesAt(map, e.point);
+        const hoverSrc = map.getSource("uv-hover-road") as maplibregl.GeoJSONSource;
+        if (feats.length) {
+          hoverSrc?.setData({ type: "FeatureCollection", features: [feats[0]] });
+          map.getCanvas().style.cursor = "pointer";
+        } else {
+          hoverSrc?.setData(emptyFC);
+          map.getCanvas().style.cursor = "";
+        }
+      });
+
+      map.on("click", (e: MapMouseEvent) => {
+        if (drawModeRef.current !== "none") {
+          drawCoordsRef.current.push([e.lngLat.lng, e.lngLat.lat]);
+          const vSrc = map.getSource("uv-draw-vertices") as maplibregl.GeoJSONSource;
+          vSrc?.setData({
+            type: "FeatureCollection",
+            features: drawCoordsRef.current.map((c) => ({
+              type: "Feature", geometry: { type: "Point", coordinates: c }, properties: {},
+            })),
+          });
+          return;
+        }
+
+        const feats = roadFeaturesAt(map, e.point);
+        if (!feats.length) {
+          selectedRef.current.clear();
+          (map.getSource("uv-selected-roads") as maplibregl.GeoJSONSource)?.setData(emptyFC);
+          onSelectionChange?.({ count: 0, lastClicked: null });
+          return;
+        }
+        const f = feats[0];
+        const key = featureKey(f);
+        if (selectedRef.current.has(key)) selectedRef.current.delete(key);
+        else selectedRef.current.set(key, f);
+
+        (map.getSource("uv-selected-roads") as maplibregl.GeoJSONSource)?.setData({
+          type: "FeatureCollection",
+          features: Array.from(selectedRef.current.values()),
+        });
+
+        const p = (f.properties ?? {}) as Record<string, any>;
+        const info: RoadFeatureInfo = {
+          id: key,
+          name: p.name ?? p["name:latin"] ?? "Unnamed segment",
+          class: p.class ?? "road",
+          type: p.subclass ?? p.type,
+          surface: p.surface,
+          lanes: p.lanes != null ? String(p.lanes) : undefined,
+          maxspeed: p.maxspeed,
+        };
+        onSelectionChange?.({ count: selectedRef.current.size, lastClicked: info });
+      });
+
+      // Double-click commits the in-progress drawing
+      map.on("dblclick", (e) => {
+        if (drawModeRef.current === "none") return;
+        e.preventDefault();
+        const coords = drawCoordsRef.current;
+        if (coords.length < 2) {
+          drawCoordsRef.current = [];
+          return;
+        }
+        const feature: GeoJSON.Feature = {
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: coords },
+          properties: { kind: drawModeRef.current },
+        };
+        const linesSrc = map.getSource("uv-draw-lines") as maplibregl.GeoJSONSource;
+        // append by reading current; we don't keep state — emit out and let parent re-mount if needed
+        const current = (linesSrc as any)._data as GeoJSON.FeatureCollection | undefined;
+        const next: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features: [...(current?.features ?? []), feature],
+        };
+        linesSrc?.setData(next);
+        (map.getSource("uv-draw-progress") as maplibregl.GeoJSONSource)?.setData(emptyFC);
+        (map.getSource("uv-draw-vertices") as maplibregl.GeoJSONSource)?.setData(emptyFC);
+        drawCoordsRef.current = [];
+        onDrawCreate?.(feature);
       });
 
       cleanup = () => {
         map.remove();
         mapRef.current = null;
-        drawRef.current = null;
         setReady(false);
       };
     })();
@@ -195,18 +247,18 @@ export function MapboxMap({
       cleanup?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, []);
 
   // Track drawMode without re-init
-  const drawModeRef = useRef(drawMode);
   useEffect(() => {
     drawModeRef.current = drawMode;
-    const draw = drawRef.current;
-    if (!draw) return;
     if (drawMode === "none") {
-      try { draw.changeMode("simple_select"); } catch { /* noop */ }
-    } else {
-      try { draw.changeMode("draw_line_string"); } catch { /* noop */ }
+      drawCoordsRef.current = [];
+      const map = mapRef.current;
+      if (map) {
+        (map.getSource("uv-draw-progress") as maplibregl.GeoJSONSource | undefined)?.setData(emptyFC);
+        (map.getSource("uv-draw-vertices") as maplibregl.GeoJSONSource | undefined)?.setData(emptyFC);
+      }
     }
   }, [drawMode]);
 
@@ -267,67 +319,34 @@ export function MapboxMap({
         },
       });
     } else if (overlay === "traffic") {
-      map.addLayer({
-        id: "uv-overlay-traffic",
-        type: "line",
-        source: "composite",
-        "source-layer": "road",
-        filter: ["in", "class", "motorway", "trunk", "primary", "secondary", "tertiary"],
-        paint: {
-          "line-color": [
-            "match", ["get", "class"],
-            "motorway", "#ef4444",
-            "trunk", "#f97316",
-            "primary", "#fbbf24",
-            "secondary", "#22c55e",
-            "#22c55e",
-          ],
-          "line-width": [
-            "interpolate", ["linear"], ["zoom"],
-            10, 1.2, 14, 3, 18, 6,
-          ],
-          "line-opacity": 0.7,
+      // Color-tint major roads from the OpenMapTiles transportation layer.
+      map.addLayer(
+        {
+          id: "uv-overlay-traffic",
+          type: "line",
+          source: ROAD_SOURCE,
+          "source-layer": ROAD_SOURCE_LAYER,
+          filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary"]]],
+          paint: {
+            "line-color": [
+              "match", ["get", "class"],
+              "motorway", "#ef4444",
+              "trunk", "#f97316",
+              "primary", "#fbbf24",
+              "secondary", "#22c55e",
+              "#22c55e",
+            ],
+            "line-width": [
+              "interpolate", ["linear"], ["zoom"],
+              10, 1.2, 14, 3, 18, 6,
+            ],
+            "line-opacity": 0.7,
+          },
         },
-      }, "uv-road-highlight");
+        "uv-road-hover",
+      );
     }
   }, [overlay, ready, center]);
-
-  if (!token) {
-    return (
-      <div className="absolute inset-0 grid place-items-center bg-background p-6">
-        <div className="panel-surface rounded-md p-5 max-w-md w-full">
-          <div className="flex items-center gap-2 mb-3">
-            <KeyRound className="size-4 text-primary" />
-            <div className="text-sm font-medium">Mapbox token required</div>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Paste your Mapbox public token (starts with <code className="text-mono">pk.</code>). Get one free at{" "}
-            <a className="text-info underline" href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noreferrer">
-              account.mapbox.com
-            </a>. Stored locally in this browser.
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="pk.eyJ1Ijoi…"
-              className="text-mono text-xs"
-            />
-            <Button
-              size="sm"
-              disabled={!tokenInput.startsWith("pk.")}
-              onClick={() => {
-                localStorage.setItem(TOKEN_KEY, tokenInput.trim());
-                setToken(tokenInput.trim());
-              }}
-            >
-              Save
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -372,6 +391,33 @@ function btnCls(active: boolean) {
 
 // --- helpers -------------------------------------------------------------
 
+function roadFeaturesAt(map: MlMap, point: { x: number; y: number }): MapGeoJSONFeature[] {
+  // Tolerance box to make thin road lines easier to click
+  const b = 4;
+  const bbox: [[number, number], [number, number]] = [
+    [point.x - b, point.y - b],
+    [point.x + b, point.y + b],
+  ];
+  try {
+    return map.queryRenderedFeatures(bbox, {
+      // Filter by sourceLayer to grab the road network from the basemap style
+      filter: ["all"],
+    }).filter((f) => f.sourceLayer === ROAD_SOURCE_LAYER && f.geometry.type !== "Point");
+  } catch {
+    return [];
+  }
+}
+
+function featureKey(f: MapGeoJSONFeature): string {
+  const p = (f.properties ?? {}) as Record<string, any>;
+  if (f.id != null) return String(f.id);
+  // Fallback: name+class+first coord
+  const g = f.geometry as any;
+  const c = g?.coordinates?.[0];
+  const coord = Array.isArray(c) ? (Array.isArray(c[0]) ? c[0] : c) : null;
+  return `${p.name ?? p.class ?? "road"}@${coord ? coord.join(",") : Math.random().toString(36).slice(2)}`;
+}
+
 function randomPoints(
   [lng, lat]: [number, number],
   count: number,
@@ -379,7 +425,6 @@ function randomPoints(
 ): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   for (let i = 0; i < count; i++) {
-    // cluster a bit toward center using two random draws
     const dx = (Math.random() - 0.5 + (Math.random() - 0.5)) * spread;
     const dy = (Math.random() - 0.5 + (Math.random() - 0.5)) * spread;
     features.push({
@@ -418,17 +463,5 @@ function floodPolygons([lng, lat]: [number, number]): GeoJSON.FeatureCollection 
   };
 }
 
-const drawStyles = [
-  {
-    id: "gl-draw-line",
-    type: "line",
-    filter: ["all", ["==", "$type", "LineString"]],
-    paint: { "line-color": "#3b82f6", "line-width": 3, "line-dasharray": [2, 1] },
-  },
-  {
-    id: "gl-draw-polygon-and-line-vertex-active",
-    type: "circle",
-    filter: ["all", ["==", "$type", "Point"], ["==", "meta", "vertex"]],
-    paint: { "circle-radius": 4, "circle-color": "#3b82f6" },
-  },
-];
+// Re-import for inner type usage in setData callbacks
+import type maplibregl from "maplibre-gl";
