@@ -31,7 +31,7 @@ function Simulator() {
     count: 0,
     lastClicked: null,
   });
-  const [drawnFeatures, setDrawnFeatures] = useState<GJ.Feature[]>([]);
+  const [drawnFeatures, setDrawnFeatures] = useState<import("geojson").Feature[]>([]);
   const [ran, setRan] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mapKey, setMapKey] = useState(0);
