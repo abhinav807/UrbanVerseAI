@@ -149,6 +149,53 @@ export function MapboxMap({
           paint: { "circle-radius": 4, "circle-color": "#3b82f6", "circle-stroke-color": "#fff", "circle-stroke-width": 1 },
         });
 
+        // POI overlay (Delhi metro/hospitals/schools/govt/landmarks)
+        map.addSource("uv-pois", {
+          type: "geojson",
+          data: poiFeatureCollection(),
+        });
+        map.addLayer({
+          id: "uv-pois-circles",
+          type: "circle",
+          source: "uv-pois",
+          layout: { visibility: showPois ? "visible" : "none" },
+          paint: {
+            "circle-radius": [
+              "interpolate", ["linear"], ["zoom"],
+              9, 2.5, 12, 4.5, 16, 8,
+            ],
+            "circle-color": [
+              "match", ["get", "kind"],
+              "metro", "#22d3ee",
+              "hospital", "#ef4444",
+              "school", "#fbbf24",
+              "govt", "#a78bfa",
+              "#22c55e",
+            ],
+            "circle-stroke-color": "#0b1220",
+            "circle-stroke-width": 1.2,
+            "circle-opacity": 0.95,
+          },
+        });
+        map.addLayer({
+          id: "uv-pois-labels",
+          type: "symbol",
+          source: "uv-pois",
+          minzoom: 12.5,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 10,
+            "text-offset": [0, 1.1],
+            "text-anchor": "top",
+            "text-font": ["Noto Sans Regular"],
+          },
+          paint: {
+            "text-color": "#e5e7eb",
+            "text-halo-color": "#0b1220",
+            "text-halo-width": 1.2,
+          },
+        });
+
         setReady(true);
       });
 
