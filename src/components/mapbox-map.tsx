@@ -28,6 +28,7 @@ interface Props {
   onDrawCreate?: (geojson: GJ.Feature) => void;
   center?: [number, number];
   zoom?: number;
+  showPois?: boolean;
 }
 
 // OpenFreeMap — free, no-API-key vector tiles based on OpenStreetMap (OpenMapTiles schema).
