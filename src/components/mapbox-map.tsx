@@ -523,30 +523,40 @@ function randomPoints(
   return { type: "FeatureCollection", features };
 }
 
-function floodPolygons([lng, lat]: [number, number]): GJ.FeatureCollection {
-  const make = (cx: number, cy: number, r: number, risk: string) => {
+function delhiFloodPolygons(): GJ.FeatureCollection {
+  const make = (cx: number, cy: number, r: number, risk: string, name: string) => {
     const pts: [number, number][] = [];
-    const sides = 14;
+    const sides = 16;
+    // Deterministic jitter for stable shapes
+    const seedRand = (i: number) => {
+      const v = Math.sin(i * 12.9898 + cx * 78.233 + cy * 37.719) * 43758.5453;
+      return v - Math.floor(v);
+    };
     for (let i = 0; i <= sides; i++) {
       const a = (i / sides) * Math.PI * 2;
-      const jitter = 0.7 + Math.random() * 0.6;
-      pts.push([cx + Math.cos(a) * r * jitter, cy + Math.sin(a) * r * jitter]);
+      const jitter = 0.75 + seedRand(i) * 0.5;
+      pts.push([cx + Math.cos(a) * r * jitter, cy + Math.sin(a) * r * jitter * 0.7]);
     }
     return {
       type: "Feature" as const,
       geometry: { type: "Polygon" as const, coordinates: [pts] },
-      properties: { risk },
+      properties: { risk, name },
     };
   };
   return {
     type: "FeatureCollection",
-    features: [
-      make(lng - 0.018, lat - 0.012, 0.014, "high"),
-      make(lng + 0.022, lat + 0.008, 0.018, "med"),
-      make(lng - 0.005, lat + 0.024, 0.012, "med"),
-      make(lng + 0.03, lat - 0.02, 0.01, "high"),
-      make(lng - 0.035, lat + 0.005, 0.016, "low"),
-    ],
+    features: FLOOD_ZONES.map((z) => make(z.lng, z.lat, z.radius, z.risk, z.name)),
+  };
+}
+
+function poiFeatureCollection(): GJ.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: ALL_POIS.map((p) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+      properties: { name: p.name, kind: p.kind },
+    })),
   };
 }
 
