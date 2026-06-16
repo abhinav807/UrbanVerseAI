@@ -44,8 +44,9 @@ export function MapboxMap({
   onSelectionChange,
   drawMode = "none",
   onDrawCreate,
-  center = [-74.006, 40.7128],
-  zoom = 12.2,
+  center = DELHI_CENTER,
+  zoom = DELHI_ZOOM,
+  showPois = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
