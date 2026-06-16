@@ -718,5 +718,21 @@ function poiFeatureCollection(): GJ.FeatureCollection {
   };
 }
 
+function emergencyFeatureCollection(): GJ.FeatureCollection {
+  const tag = (svc: string) => (p: { name: string; lng: number; lat: number }) => ({
+    type: "Feature" as const,
+    geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
+    properties: { name: p.name, svc },
+  });
+  return {
+    type: "FeatureCollection",
+    features: [
+      ...HOSPITALS.map(tag("Hospital")),
+      ...FIRE_STATIONS.map(tag("Fire")),
+      ...POLICE_STATIONS.map(tag("Police")),
+    ],
+  };
+}
+
 // Re-import for inner type usage in setData callbacks
 import type maplibregl from "maplibre-gl";
