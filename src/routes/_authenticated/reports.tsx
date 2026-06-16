@@ -9,25 +9,25 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
     meta: [
-      { title: "Reports — UrbanVerse" },
-      { name: "description", content: "Previous simulations, AI recommendations, and exportable PDF reports." },
+      { title: "Reports — UrbanVerse Delhi" },
+      { name: "description", content: "Delhi NCR urban impact assessments, AI recommendations, and exportable PDF reports." },
     ],
   }),
   component: Reports,
 });
 
 const reports = [
-  { id: "S-2026-0418", title: "I-95 corridor closure · phased rollout", date: "2026-06-12", author: "E. Vasquez", impact: "−14% peak congestion", status: "Approved" },
-  { id: "S-2026-0411", title: "Riverside flood mitigation · seawall + pumps", date: "2026-06-08", author: "M. Okafor", impact: "−62% 100-yr exposure", status: "Under review" },
-  { id: "S-2026-0402", title: "Madison Ave overpass repair window", date: "2026-06-01", author: "K. Tanaka", impact: "+96% load capacity", status: "Approved" },
-  { id: "S-2026-0388", title: "EV charging corridor expansion · Phase 2", date: "2026-05-24", author: "E. Vasquez", impact: "+18% adoption forecast", status: "Draft" },
-  { id: "S-2026-0376", title: "Transit signal priority · Route 1A", date: "2026-05-19", author: "J. Lindqvist", impact: "−2.4 min avg travel", status: "Approved" },
+  { id: "S-2026-0418", title: "NH-48 Delhi–Gurugram peak diversion · phased rollout", date: "2026-06-12", author: "E. Vasquez", impact: "−14% peak congestion", status: "Approved" },
+  { id: "S-2026-0411", title: "Yamuna floodplain mitigation · ITO embankment + Okhla pumps", date: "2026-06-08", author: "M. Okafor", impact: "−58% 100-yr exposure", status: "Under review" },
+  { id: "S-2026-0402", title: "Minto Bridge underpass pumping upgrade", date: "2026-06-01", author: "K. Tanaka", impact: "+96% drainage capacity", status: "Approved" },
+  { id: "S-2026-0388", title: "DMRC Phase IV last-mile EV feeder corridors", date: "2026-05-24", author: "E. Vasquez", impact: "+18% ridership forecast", status: "Draft" },
+  { id: "S-2026-0376", title: "Adaptive signal priority · Ring Road (AIIMS–Bhairon Marg)", date: "2026-05-19", author: "J. Lindqvist", impact: "−2.6 min avg travel", status: "Approved" },
 ];
 
 const recs = [
-  { tag: "HIGH PRIORITY", title: "Reinforce Madison Ave overpass before Q4", body: "Stress sensors show 14% load increase YoY. Reinforcement during low-traffic windows minimizes disruption while extending asset life by an estimated 18 years." },
-  { tag: "STRATEGIC", title: "Stage Riverside seawall expansion", body: "Climate models project +0.8m sea level by 2055. Phased seawall construction across 3 fiscal years aligns with bond capacity and reduces 100-year flood exposure by 62%." },
-  { tag: "OPTIMIZATION", title: "Re-time signals on Route 1A corridor", body: "ML analysis of 90-day traffic flow suggests adaptive signal timing could reduce peak travel by 2.4 minutes per trip — affecting 184K daily commuters." },
+  { tag: "HIGH PRIORITY", title: "Reinforce Minto Bridge & ITO drainage before monsoon", body: "Pump-station telemetry shows recurring overflow during >40 mm/hr events. Upgrading capacity ahead of July monsoon reduces Connaught Place catchment flooding risk by an estimated 71%." },
+  { tag: "STRATEGIC", title: "Phase Yamuna floodplain embankment · Wazirabad → Okhla", body: "CWC hydrology projects 204.8 m peak at Old Railway Bridge by 2030. Phased embankment + retention ponds across 3 fiscal years lower 100-year flood exposure for ~1.2M residents." },
+  { tag: "OPTIMIZATION", title: "Re-time NH-48 ramps · Dhaula Kuan to Sirhaul", body: "ML analysis of 90-day flow data suggests adaptive ramp metering could shave 2.6 min/trip on the Delhi–Gurugram corridor — affecting ~340K daily commuters and EMS routes to AIIMS / Medanta." },
 ];
 
 function Reports() {
