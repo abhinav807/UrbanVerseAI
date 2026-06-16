@@ -19,6 +19,8 @@ export interface RoadFeatureInfo {
   surface?: string;
   lanes?: string;
   maxspeed?: string;
+  lng?: number;
+  lat?: number;
 }
 
 interface Props {
