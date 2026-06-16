@@ -61,12 +61,25 @@ function Simulator() {
   const queryClient = useQueryClient();
 
   const n = selection.count;
-  const mult = { block: 1, extend: -0.6, repair: -0.3, build: -0.8 }[action];
+  const lc = selection.lastClicked;
+  const ctx = nearbyContext(lc && lc.lng != null && lc.lat != null ? { lng: lc.lng, lat: lc.lat } : null);
+  // Road class weight (motorways/highways move more people)
+  const classW = lc?.class
+    ? ({ motorway: 1.6, trunk: 1.4, primary: 1.2, secondary: 1.0, tertiary: 0.8 } as Record<string, number>)[lc.class] ?? 0.6
+    : 1.0;
+  // Negative = improvement (good), Positive = worsening
+  const dir = { block: 1, extend: -0.6, repair: -0.3, build: -0.8 }[action];
+  const base = Math.max(n, lc ? 1 : 0);
+  const connectivityPenalty = 1 + ctx.metros * 0.15 + ctx.pois * 0.02;
   const results = {
-    trafficDelta: n === 0 ? 0 : +(n * 4.2 * mult).toFixed(1),
-    congestionDelta: n === 0 ? 0 : +(n * 6.1 * mult).toFixed(1),
-    emergencyDelay: n === 0 ? 0 : +(n * 0.7 * Math.max(mult, 0.2)).toFixed(2),
-    population: n * 4180 + (action === "block" ? 2400 : 0),
+    trafficDelta: +(base * 5.2 * dir * classW * connectivityPenalty).toFixed(1),
+    congestionDelta: +(base * 7.4 * dir * classW * connectivityPenalty).toFixed(1),
+    emergencyDelay: +(base * 0.9 * Math.max(dir, 0.2) * (1 + ctx.hospitals * 0.25)).toFixed(2),
+    nearbyCongestion: +(base * 4.1 * dir * classW).toFixed(1),
+    travelTimeDelta: +(base * 1.4 * dir * classW).toFixed(1),
+    population: Math.round(base * (5200 + ctx.schools * 1800 + ctx.metros * 4600) + (action === "block" ? 6200 : 0)),
+    context: ctx,
+    roadClass: lc?.class ?? null,
   };
 
   const runAndSave = async () => {
