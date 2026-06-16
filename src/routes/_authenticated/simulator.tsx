@@ -11,17 +11,42 @@ import {
 import { createSimulation } from "@/lib/api/crud";
 import { toast } from "sonner";
 
+import { createSimulation } from "@/lib/api/crud";
+import { toast } from "sonner";
+import { ALL_POIS, HOSPITALS, METRO_STATIONS, SCHOOLS } from "@/lib/delhi-data";
+
 export const Route = createFileRoute("/_authenticated/simulator")({
   head: () => ({
     meta: [
-      { title: "Simulator — UrbanVerse" },
-      { name: "description", content: "Run what-if scenarios on the real road network." },
+      { title: "Simulator — UrbanVerse Delhi" },
+      { name: "description", content: "Run what-if scenarios on the real Delhi NCR road network." },
     ],
   }),
   component: Simulator,
 });
 
 type Action = "block" | "extend" | "repair" | "build";
+
+// Approx distance in metres between two lng/lat points (equirectangular).
+function distM(a: { lng: number; lat: number }, b: { lng: number; lat: number }) {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const x = dLng * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  return Math.sqrt(x * x + dLat * dLat) * R;
+}
+
+// Returns counts of POIs within radius
+function nearbyContext(point: { lng: number; lat: number } | null, radiusM = 1500) {
+  if (!point) return { hospitals: 0, metros: 0, schools: 0, pois: 0 };
+  const within = (list: typeof ALL_POIS) => list.filter((p) => distM(point, p) <= radiusM).length;
+  return {
+    hospitals: within(HOSPITALS),
+    metros: within(METRO_STATIONS),
+    schools: within(SCHOOLS),
+    pois: within(ALL_POIS),
+  };
+}
 
 function Simulator() {
   const [action, setAction] = useState<Action>("block");
