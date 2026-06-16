@@ -1,10 +1,13 @@
-// MapLibre GL + OpenStreetMap-based implementation.
+// MapLibre GL + OpenStreetMap-based implementation, focused on Delhi NCR.
 // Filename kept for backward compatibility — exports MapboxMap/MapDrawToolbar names.
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
 import type * as GJ from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Pencil, Route as RouteIcon, Trash2 } from "lucide-react";
+import {
+  DELHI_CENTER, DELHI_ZOOM, ALL_POIS, FLOOD_ZONES, type FlyToDetail,
+} from "@/lib/delhi-data";
 
 export type OverlayKind = "none" | "traffic" | "heatmap" | "flood";
 
@@ -16,6 +19,8 @@ export interface RoadFeatureInfo {
   surface?: string;
   lanes?: string;
   maxspeed?: string;
+  lng?: number;
+  lat?: number;
 }
 
 interface Props {
@@ -25,6 +30,7 @@ interface Props {
   onDrawCreate?: (geojson: GJ.Feature) => void;
   center?: [number, number];
   zoom?: number;
+  showPois?: boolean;
 }
 
 // OpenFreeMap — free, no-API-key vector tiles based on OpenStreetMap (OpenMapTiles schema).
@@ -40,8 +46,9 @@ export function MapboxMap({
   onSelectionChange,
   drawMode = "none",
   onDrawCreate,
-  center = [-74.006, 40.7128],
-  zoom = 12.2,
+  center = DELHI_CENTER,
+  zoom = DELHI_ZOOM,
+  showPois = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -144,6 +151,53 @@ export function MapboxMap({
           paint: { "circle-radius": 4, "circle-color": "#3b82f6", "circle-stroke-color": "#fff", "circle-stroke-width": 1 },
         });
 
+        // POI overlay (Delhi metro/hospitals/schools/govt/landmarks)
+        map.addSource("uv-pois", {
+          type: "geojson",
+          data: poiFeatureCollection(),
+        });
+        map.addLayer({
+          id: "uv-pois-circles",
+          type: "circle",
+          source: "uv-pois",
+          layout: { visibility: showPois ? "visible" : "none" },
+          paint: {
+            "circle-radius": [
+              "interpolate", ["linear"], ["zoom"],
+              9, 2.5, 12, 4.5, 16, 8,
+            ],
+            "circle-color": [
+              "match", ["get", "kind"],
+              "metro", "#22d3ee",
+              "hospital", "#ef4444",
+              "school", "#fbbf24",
+              "govt", "#a78bfa",
+              "#22c55e",
+            ],
+            "circle-stroke-color": "#0b1220",
+            "circle-stroke-width": 1.2,
+            "circle-opacity": 0.95,
+          },
+        });
+        map.addLayer({
+          id: "uv-pois-labels",
+          type: "symbol",
+          source: "uv-pois",
+          minzoom: 12.5,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 10,
+            "text-offset": [0, 1.1],
+            "text-anchor": "top",
+            "text-font": ["Noto Sans Regular"],
+          },
+          paint: {
+            "text-color": "#e5e7eb",
+            "text-halo-color": "#0b1220",
+            "text-halo-width": 1.2,
+          },
+        });
+
         setReady(true);
       });
 
@@ -216,6 +270,8 @@ export function MapboxMap({
           surface: p.surface,
           lanes: p.lanes != null ? String(p.lanes) : undefined,
           maxspeed: p.maxspeed,
+          lng: e.lngLat.lng,
+          lat: e.lngLat.lat,
         };
         onSelectionChange?.({ count: selectedRef.current.size, lastClicked: info });
       });
@@ -314,7 +370,7 @@ export function MapboxMap({
     } else if (overlay === "flood") {
       map.addSource("uv-overlay-flood", {
         type: "geojson",
-        data: floodPolygons(center),
+        data: delhiFloodPolygons(),
       });
       map.addLayer({
         id: "uv-overlay-flood",
@@ -360,6 +416,28 @@ export function MapboxMap({
       );
     }
   }, [overlay, ready, center]);
+
+  // Toggle POI layer visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const vis = showPois ? "visible" : "none";
+    if (map.getLayer("uv-pois-circles")) map.setLayoutProperty("uv-pois-circles", "visibility", vis);
+    if (map.getLayer("uv-pois-labels")) map.setLayoutProperty("uv-pois-labels", "visibility", vis);
+  }, [showPois, ready]);
+
+  // Cross-component fly-to bus (AI Planner → map)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const d = (e as CustomEvent<FlyToDetail>).detail;
+      if (!d) return;
+      map.flyTo({ center: [d.lng, d.lat], zoom: d.zoom ?? 14.5, speed: 1.2 });
+    };
+    window.addEventListener("uv:flyTo", handler);
+    return () => window.removeEventListener("uv:flyTo", handler);
+  }, []);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -449,30 +527,40 @@ function randomPoints(
   return { type: "FeatureCollection", features };
 }
 
-function floodPolygons([lng, lat]: [number, number]): GJ.FeatureCollection {
-  const make = (cx: number, cy: number, r: number, risk: string) => {
+function delhiFloodPolygons(): GJ.FeatureCollection {
+  const make = (cx: number, cy: number, r: number, risk: string, name: string) => {
     const pts: [number, number][] = [];
-    const sides = 14;
+    const sides = 16;
+    // Deterministic jitter for stable shapes
+    const seedRand = (i: number) => {
+      const v = Math.sin(i * 12.9898 + cx * 78.233 + cy * 37.719) * 43758.5453;
+      return v - Math.floor(v);
+    };
     for (let i = 0; i <= sides; i++) {
       const a = (i / sides) * Math.PI * 2;
-      const jitter = 0.7 + Math.random() * 0.6;
-      pts.push([cx + Math.cos(a) * r * jitter, cy + Math.sin(a) * r * jitter]);
+      const jitter = 0.75 + seedRand(i) * 0.5;
+      pts.push([cx + Math.cos(a) * r * jitter, cy + Math.sin(a) * r * jitter * 0.7]);
     }
     return {
       type: "Feature" as const,
       geometry: { type: "Polygon" as const, coordinates: [pts] },
-      properties: { risk },
+      properties: { risk, name },
     };
   };
   return {
     type: "FeatureCollection",
-    features: [
-      make(lng - 0.018, lat - 0.012, 0.014, "high"),
-      make(lng + 0.022, lat + 0.008, 0.018, "med"),
-      make(lng - 0.005, lat + 0.024, 0.012, "med"),
-      make(lng + 0.03, lat - 0.02, 0.01, "high"),
-      make(lng - 0.035, lat + 0.005, 0.016, "low"),
-    ],
+    features: FLOOD_ZONES.map((z) => make(z.lng, z.lat, z.radius, z.risk, z.name)),
+  };
+}
+
+function poiFeatureCollection(): GJ.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: ALL_POIS.map((p) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+      properties: { name: p.name, kind: p.kind },
+    })),
   };
 }
 

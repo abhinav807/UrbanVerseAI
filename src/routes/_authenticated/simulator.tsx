@@ -11,17 +11,40 @@ import {
 import { createSimulation } from "@/lib/api/crud";
 import { toast } from "sonner";
 
+import { ALL_POIS, HOSPITALS, METRO_STATIONS, SCHOOLS } from "@/lib/delhi-data";
+
 export const Route = createFileRoute("/_authenticated/simulator")({
   head: () => ({
     meta: [
-      { title: "Simulator — UrbanVerse" },
-      { name: "description", content: "Run what-if scenarios on the real road network." },
+      { title: "Simulator — UrbanVerse Delhi" },
+      { name: "description", content: "Run what-if scenarios on the real Delhi NCR road network." },
     ],
   }),
   component: Simulator,
 });
 
 type Action = "block" | "extend" | "repair" | "build";
+
+// Approx distance in metres between two lng/lat points (equirectangular).
+function distM(a: { lng: number; lat: number }, b: { lng: number; lat: number }) {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const x = dLng * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  return Math.sqrt(x * x + dLat * dLat) * R;
+}
+
+// Returns counts of POIs within radius
+function nearbyContext(point: { lng: number; lat: number } | null, radiusM = 1500) {
+  if (!point) return { hospitals: 0, metros: 0, schools: 0, pois: 0 };
+  const within = (list: typeof ALL_POIS) => list.filter((p) => distM(point, p) <= radiusM).length;
+  return {
+    hospitals: within(HOSPITALS),
+    metros: within(METRO_STATIONS),
+    schools: within(SCHOOLS),
+    pois: within(ALL_POIS),
+  };
+}
 
 function Simulator() {
   const [action, setAction] = useState<Action>("block");
@@ -38,12 +61,25 @@ function Simulator() {
   const queryClient = useQueryClient();
 
   const n = selection.count;
-  const mult = { block: 1, extend: -0.6, repair: -0.3, build: -0.8 }[action];
+  const lc = selection.lastClicked;
+  const ctx = nearbyContext(lc && lc.lng != null && lc.lat != null ? { lng: lc.lng, lat: lc.lat } : null);
+  // Road class weight (motorways/highways move more people)
+  const classW = lc?.class
+    ? ({ motorway: 1.6, trunk: 1.4, primary: 1.2, secondary: 1.0, tertiary: 0.8 } as Record<string, number>)[lc.class] ?? 0.6
+    : 1.0;
+  // Negative = improvement (good), Positive = worsening
+  const dir = { block: 1, extend: -0.6, repair: -0.3, build: -0.8 }[action];
+  const base = Math.max(n, lc ? 1 : 0);
+  const connectivityPenalty = 1 + ctx.metros * 0.15 + ctx.pois * 0.02;
   const results = {
-    trafficDelta: n === 0 ? 0 : +(n * 4.2 * mult).toFixed(1),
-    congestionDelta: n === 0 ? 0 : +(n * 6.1 * mult).toFixed(1),
-    emergencyDelay: n === 0 ? 0 : +(n * 0.7 * Math.max(mult, 0.2)).toFixed(2),
-    population: n * 4180 + (action === "block" ? 2400 : 0),
+    trafficDelta: +(base * 5.2 * dir * classW * connectivityPenalty).toFixed(1),
+    congestionDelta: +(base * 7.4 * dir * classW * connectivityPenalty).toFixed(1),
+    emergencyDelay: +(base * 0.9 * Math.max(dir, 0.2) * (1 + ctx.hospitals * 0.25)).toFixed(2),
+    nearbyCongestion: +(base * 4.1 * dir * classW).toFixed(1),
+    travelTimeDelta: +(base * 1.4 * dir * classW).toFixed(1),
+    population: Math.round(base * (5200 + ctx.schools * 1800 + ctx.metros * 4600) + (action === "block" ? 6200 : 0)),
+    context: ctx,
+    roadClass: lc?.class ?? null,
   };
 
   const runAndSave = async () => {
@@ -179,10 +215,20 @@ function Simulator() {
               </div>
             ) : (
               <div className="p-3 space-y-2 overflow-y-auto">
-                <ResultRow label="Traffic" value={`${results.trafficDelta > 0 ? "+" : ""}${results.trafficDelta}%`} status={results.trafficDelta > 0 ? "danger" : "safe"} />
-                <ResultRow label="Congestion" value={`${results.congestionDelta > 0 ? "+" : ""}${results.congestionDelta}%`} status={results.congestionDelta > 0 ? "warn" : "safe"} />
-                <ResultRow label="Emergency delay" value={`${results.emergencyDelay > 0 ? "+" : ""}${results.emergencyDelay} min`} status={results.emergencyDelay > 0.5 ? "danger" : results.emergencyDelay > 0 ? "warn" : "safe"} />
-                <ResultRow label="Population affected" value={results.population.toLocaleString()} status="info" />
+                <ResultRow label="Traffic impact" value={`${results.trafficDelta > 0 ? "+" : ""}${results.trafficDelta}%`} status={results.trafficDelta > 0 ? "danger" : "safe"} />
+                <ResultRow label="Travel time" value={`${results.travelTimeDelta > 0 ? "+" : ""}${results.travelTimeDelta}%`} status={results.travelTimeDelta > 0 ? "warn" : "safe"} />
+                <ResultRow label="Nearby congestion" value={`${results.nearbyCongestion > 0 ? "+" : ""}${results.nearbyCongestion}%`} status={results.nearbyCongestion > 0 ? "warn" : "safe"} />
+                <ResultRow label="Emergency access" value={`${results.emergencyDelay > 0 ? "+" : ""}${results.emergencyDelay} min`} status={results.emergencyDelay > 0.5 ? "danger" : results.emergencyDelay > 0 ? "warn" : "safe"} />
+                <ResultRow label="Population impacted" value={results.population.toLocaleString()} status="info" />
+                <div className="border border-border rounded-md p-2.5 bg-background/40">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Delhi context · within 1.5 km</div>
+                  <div className="grid grid-cols-2 gap-y-1 text-[11px]">
+                    <span className="text-muted-foreground">Road class</span><span className="text-mono text-right">{results.roadClass ?? "—"}</span>
+                    <span className="text-muted-foreground">Metro stations</span><span className="text-mono text-right">{results.context.metros}</span>
+                    <span className="text-muted-foreground">Hospitals</span><span className="text-mono text-right">{results.context.hospitals}</span>
+                    <span className="text-muted-foreground">Schools</span><span className="text-mono text-right">{results.context.schools}</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
