@@ -270,6 +270,8 @@ export function MapboxMap({
           surface: p.surface,
           lanes: p.lanes != null ? String(p.lanes) : undefined,
           maxspeed: p.maxspeed,
+          lng: e.lngLat.lng,
+          lat: e.lngLat.lat,
         };
         onSelectionChange?.({ count: selectedRef.current.size, lastClicked: info });
       });
