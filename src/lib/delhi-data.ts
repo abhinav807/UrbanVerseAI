@@ -155,3 +155,75 @@ export function emitFlyTo(detail: FlyToDetail) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent<FlyToDetail>("uv:flyTo", { detail }));
 }
+
+// ─── Emergency services (real Delhi locations, curated) ───────────────────────
+export const FIRE_STATIONS: Poi[] = [
+  { name: "Delhi Fire HQ Connaught Lane", lng: 77.2191, lat: 28.6262, kind: "govt" },
+  { name: "Fire Station Lajpat Nagar", lng: 77.2425, lat: 28.5703, kind: "govt" },
+  { name: "Fire Station Dwarka", lng: 77.0697, lat: 28.5917, kind: "govt" },
+  { name: "Fire Station Rohini", lng: 77.1100, lat: 28.7383, kind: "govt" },
+  { name: "Fire Station Shahdara", lng: 77.2890, lat: 28.6735, kind: "govt" },
+  { name: "Fire Station Mehrauli", lng: 77.1810, lat: 28.5240, kind: "govt" },
+  { name: "Fire Station Nehru Place", lng: 77.2528, lat: 28.5485, kind: "govt" },
+  { name: "Fire Station Karol Bagh", lng: 77.1925, lat: 28.6535, kind: "govt" },
+  { name: "Fire Station Mayur Vihar", lng: 77.2940, lat: 28.6098, kind: "govt" },
+];
+
+export const POLICE_STATIONS: Poi[] = [
+  { name: "PS Connaught Place", lng: 77.2188, lat: 28.6320, kind: "govt" },
+  { name: "PS Parliament Street", lng: 77.2125, lat: 28.6256, kind: "govt" },
+  { name: "PS Defence Colony", lng: 77.2310, lat: 28.5740, kind: "govt" },
+  { name: "PS Hauz Khas", lng: 77.2055, lat: 28.5455, kind: "govt" },
+  { name: "PS Saket", lng: 77.2202, lat: 28.5210, kind: "govt" },
+  { name: "PS Dwarka North", lng: 77.0610, lat: 28.5985, kind: "govt" },
+  { name: "PS Civil Lines", lng: 77.2225, lat: 28.6790, kind: "govt" },
+  { name: "PS Lajpat Nagar", lng: 77.2430, lat: 28.5712, kind: "govt" },
+  { name: "PS Anand Vihar", lng: 77.3158, lat: 28.6478, kind: "govt" },
+  { name: "PS Mayapuri", lng: 77.1280, lat: 28.6325, kind: "govt" },
+];
+
+// ─── Timeline horizons ────────────────────────────────────────────────────────
+export type HorizonKey = "now" | "3m" | "6m" | "1y" | "5y";
+export const HORIZONS: Array<{ key: HorizonKey; label: string; popMul: number; trafficMul: number; floodMul: number; stressMul: number; emergencyMul: number }> = [
+  { key: "now", label: "Present", popMul: 1.000, trafficMul: 1.00, floodMul: 1.00, stressMul: 1.00, emergencyMul: 1.00 },
+  { key: "3m",  label: "+3 months", popMul: 1.012, trafficMul: 1.06, floodMul: 1.18, stressMul: 1.04, emergencyMul: 1.05 },
+  { key: "6m",  label: "+6 months", popMul: 1.025, trafficMul: 1.13, floodMul: 1.32, stressMul: 1.09, emergencyMul: 1.10 },
+  { key: "1y",  label: "+1 year",   popMul: 1.050, trafficMul: 1.24, floodMul: 1.45, stressMul: 1.18, emergencyMul: 1.22 },
+  { key: "5y",  label: "+5 years",  popMul: 1.280, trafficMul: 1.95, floodMul: 1.92, stressMul: 1.74, emergencyMul: 1.70 },
+];
+
+export function horizonFactors(key: HorizonKey) {
+  return HORIZONS.find((h) => h.key === key) ?? HORIZONS[0];
+}
+
+// ─── Geo helpers ──────────────────────────────────────────────────────────────
+export function haversineKm(a: { lng: number; lat: number }, b: { lng: number; lat: number }) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+export function nearest<T extends { lng: number; lat: number; name: string }>(
+  point: { lng: number; lat: number },
+  list: T[],
+): { item: T; km: number } | null {
+  if (!list.length) return null;
+  let best = { item: list[0], km: haversineKm(point, list[0]) };
+  for (let i = 1; i < list.length; i++) {
+    const k = haversineKm(point, list[i]);
+    if (k < best.km) best = { item: list[i], km: k };
+  }
+  return best;
+}
+
+// ─── Cross-map sync bus (compare view) ────────────────────────────────────────
+export type MapSyncDetail = { group: string; lng: number; lat: number; zoom: number; bearing: number; pitch: number; from: string };
+export function emitMapSync(detail: MapSyncDetail) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<MapSyncDetail>("uv:mapSync", { detail }));
+}
+
