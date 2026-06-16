@@ -11,8 +11,6 @@ import {
 import { createSimulation } from "@/lib/api/crud";
 import { toast } from "sonner";
 
-import { createSimulation } from "@/lib/api/crud";
-import { toast } from "sonner";
 import { ALL_POIS, HOSPITALS, METRO_STATIONS, SCHOOLS } from "@/lib/delhi-data";
 
 export const Route = createFileRoute("/_authenticated/simulator")({
