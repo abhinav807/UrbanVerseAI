@@ -1,22 +1,25 @@
 import { useState } from "react";
-import { Send, Sparkles, ChevronRight } from "lucide-react";
+import { Send, Sparkles, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PanelHeader } from "@/components/kpi-card";
+import { emitFlyTo, resolveDelhiLocation } from "@/lib/delhi-data";
 
 type Msg = { from: "ai" | "user"; text: string };
 
 const seedMessages: Msg[] = [
   {
     from: "ai",
-    text: "Morning. I've reviewed overnight sensor data — congestion on the I-95 corridor is up 12% vs 7-day baseline. Want me to model a re-route via Route 1A?",
+    text:
+      "Namaste. Overnight telemetry from Delhi corridors is in — congestion on NH-48 (Delhi–Gurugram) is up 9% vs the 7-day baseline. Should I model a diversion via the Outer Ring Road?",
   },
 ];
 
 const suggestions = [
-  "Model rush-hour rerouting on I-95",
-  "Forecast flood impact for 100-year storm",
-  "Identify top 5 vulnerable intersections",
-  "Estimate ROI of repaving Sector 4-B",
+  "Simulate road closure near Rajiv Chowk Metro Station",
+  "Analyze traffic impact around Laxmi Nagar",
+  "Build a road near Connaught Place",
+  "Forecast flood impact along the Yamuna at ITO",
+  "Assess infrastructure stress at Ghazipur",
 ];
 
 export function AIPlanner() {
@@ -27,22 +30,28 @@ export function AIPlanner() {
     if (!text.trim()) return;
     setMessages((m) => [...m, { from: "user", text }]);
     setInput("");
+
+    const loc = resolveDelhiLocation(text);
+    if (loc) emitFlyTo({ lng: loc.lng, lat: loc.lat, zoom: 14.8, label: loc.name });
+
     setTimeout(() => {
+      const where = loc ? loc.name : "the selected corridor";
       setMessages((m) => [
         ...m,
         {
           from: "ai",
-          text:
-            "Running scenario · 3 simulations queued. Projected outcome: -8% peak congestion, +2.1min avg emergency response, ~46k residents affected. Want a full report?",
+          text: loc
+            ? `Centred the atlas on ${where}. Running the scenario across nearby road class, intersection density, metro proximity, and hospital access. Projected outcome: −7.4% peak congestion, +1.8 min avg emergency response, ~38k residents impacted within a 1.5 km radius. Generate full assessment?`
+            : `Could not match a Delhi location in that prompt — try a landmark like "AIIMS", "Saket", or "Anand Vihar". I'll still model the generic scenario: −6% peak congestion, ~42k residents impacted.`,
         },
       ]);
-    }, 700);
+    }, 650);
   };
 
   return (
     <div className="w-80 shrink-0 border-l border-border bg-panel flex flex-col">
       <PanelHeader
-        subtitle="Co-pilot"
+        subtitle="Co-pilot · Delhi NCR"
         title="AI Urban Planner"
         right={
           <span className="flex items-center gap-1.5 text-[10px] text-safe text-mono uppercase">
@@ -62,8 +71,8 @@ export function AIPlanner() {
             }
           >
             {m.from === "ai" && (
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                UrbanVerse · {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                <MapPin className="size-2.5" /> UrbanVerse · Delhi · {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </div>
             )}
             {m.text}
@@ -73,7 +82,7 @@ export function AIPlanner() {
 
       <div className="px-3 pb-2 space-y-1">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-          Suggested actions
+          Suggested Delhi scenarios
         </div>
         {suggestions.map((s) => (
           <button
@@ -93,7 +102,7 @@ export function AIPlanner() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send(input)}
-            placeholder="Ask the planner…"
+            placeholder="Ask about any Delhi area…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <Button
