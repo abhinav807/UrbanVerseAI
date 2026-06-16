@@ -1,10 +1,13 @@
-// MapLibre GL + OpenStreetMap-based implementation.
+// MapLibre GL + OpenStreetMap-based implementation, focused on Delhi NCR.
 // Filename kept for backward compatibility — exports MapboxMap/MapDrawToolbar names.
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl";
 import type * as GJ from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Pencil, Route as RouteIcon, Trash2 } from "lucide-react";
+import {
+  DELHI_CENTER, DELHI_ZOOM, ALL_POIS, FLOOD_ZONES, type FlyToDetail,
+} from "@/lib/delhi-data";
 
 export type OverlayKind = "none" | "traffic" | "heatmap" | "flood";
 
