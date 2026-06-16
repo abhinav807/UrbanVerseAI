@@ -366,7 +366,7 @@ export function MapboxMap({
     } else if (overlay === "flood") {
       map.addSource("uv-overlay-flood", {
         type: "geojson",
-        data: floodPolygons(center),
+        data: delhiFloodPolygons(),
       });
       map.addLayer({
         id: "uv-overlay-flood",
