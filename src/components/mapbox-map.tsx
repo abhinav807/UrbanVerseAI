@@ -6,7 +6,10 @@ import type * as GJ from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Pencil, Route as RouteIcon, Trash2 } from "lucide-react";
 import {
-  DELHI_CENTER, DELHI_ZOOM, ALL_POIS, FLOOD_ZONES, type FlyToDetail,
+  DELHI_CENTER, DELHI_ZOOM, ALL_POIS, FLOOD_ZONES,
+  FIRE_STATIONS, POLICE_STATIONS, HOSPITALS,
+  horizonFactors, emitMapSync,
+  type FlyToDetail, type HorizonKey, type MapSyncDetail,
 } from "@/lib/delhi-data";
 
 export type OverlayKind = "none" | "traffic" | "heatmap" | "flood";
@@ -31,6 +34,14 @@ interface Props {
   center?: [number, number];
   zoom?: number;
   showPois?: boolean;
+  // Advanced features
+  horizon?: HorizonKey;
+  emergencyLayer?: boolean;
+  propagationFC?: GJ.FeatureCollection;
+  emergencyCorridorsFC?: GJ.FeatureCollection;
+  syncGroup?: string;       // maps with the same group sync pan/zoom
+  syncId?: string;          // unique id of this map within the group
+  interactive?: boolean;    // disable click/draw on read-only map (compare-left)
 }
 
 // OpenFreeMap — free, no-API-key vector tiles based on OpenStreetMap (OpenMapTiles schema).
@@ -49,6 +60,13 @@ export function MapboxMap({
   center = DELHI_CENTER,
   zoom = DELHI_ZOOM,
   showPois = true,
+  horizon = "now",
+  emergencyLayer = false,
+  propagationFC,
+  emergencyCorridorsFC,
+  syncGroup,
+  syncId,
+  interactive = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
