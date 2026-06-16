@@ -216,6 +216,142 @@ export function MapboxMap({
           },
         });
 
+        // ─── Emergency services (hospitals, fire, police) ───────────────────
+        map.addSource("uv-emergency", { type: "geojson", data: emergencyFeatureCollection() });
+        map.addLayer({
+          id: "uv-emergency-halo",
+          type: "circle",
+          source: "uv-emergency",
+          layout: { visibility: emergencyLayer ? "visible" : "none" },
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 6, 14, 14],
+            "circle-color": [
+              "match", ["get", "svc"],
+              "Hospital", "#ef4444",
+              "Fire", "#f97316",
+              "Police", "#3b82f6",
+              "#22c55e",
+            ],
+            "circle-opacity": 0.18,
+            "circle-blur": 0.6,
+          },
+        });
+        map.addLayer({
+          id: "uv-emergency-circles",
+          type: "circle",
+          source: "uv-emergency",
+          layout: { visibility: emergencyLayer ? "visible" : "none" },
+          paint: {
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3, 14, 6],
+            "circle-color": [
+              "match", ["get", "svc"],
+              "Hospital", "#ef4444",
+              "Fire", "#f97316",
+              "Police", "#3b82f6",
+              "#22c55e",
+            ],
+            "circle-stroke-color": "#fff",
+            "circle-stroke-width": 1.5,
+          },
+        });
+        map.addLayer({
+          id: "uv-emergency-labels",
+          type: "symbol",
+          source: "uv-emergency",
+          minzoom: 12,
+          layout: {
+            visibility: emergencyLayer ? "visible" : "none",
+            "text-field": ["get", "name"],
+            "text-size": 9,
+            "text-offset": [0, 1.1],
+            "text-anchor": "top",
+            "text-font": ["Noto Sans Regular"],
+          },
+          paint: { "text-color": "#f3f4f6", "text-halo-color": "#0b1220", "text-halo-width": 1.4 },
+        });
+
+        // ─── Emergency corridors (focal point → nearest service) ────────────
+        map.addSource("uv-emergency-corridor", { type: "geojson", data: emptyFC });
+        map.addLayer({
+          id: "uv-emergency-corridor",
+          type: "line",
+          source: "uv-emergency-corridor",
+          paint: {
+            "line-color": [
+              "match", ["get", "service"],
+              "Hospital", "#ef4444",
+              "Fire", "#f97316",
+              "Police", "#3b82f6",
+              "#22c55e",
+            ],
+            "line-width": 2.2,
+            "line-dasharray": [2, 2],
+            "line-opacity": 0.85,
+          },
+        });
+
+        // ─── Traffic propagation (synthetic radial roads around focal point) ─
+        map.addSource("uv-propagation", { type: "geojson", data: emptyFC });
+        map.addLayer({
+          id: "uv-propagation-glow",
+          type: "line",
+          source: "uv-propagation",
+          paint: {
+            "line-color": [
+              "case",
+              ["<", ["get", "delta"], 0], "#22c55e",
+              ["<", ["get", "delta"], 15], "#fb923c",
+              "#ef4444",
+            ],
+            "line-width": [
+              "interpolate", ["linear"], ["get", "absDelta"],
+              0, 4, 30, 14,
+            ],
+            "line-opacity": 0.18,
+            "line-blur": 4,
+          },
+        });
+        map.addLayer({
+          id: "uv-propagation-lines",
+          type: "line",
+          source: "uv-propagation",
+          paint: {
+            "line-color": [
+              "case",
+              ["<", ["get", "delta"], 0], "#22c55e",
+              ["<", ["get", "delta"], 15], "#fb923c",
+              "#ef4444",
+            ],
+            "line-width": [
+              "interpolate", ["linear"], ["get", "absDelta"],
+              0, 2, 30, 6,
+            ],
+            "line-opacity": 0.95,
+            "line-dasharray": [2, 2],
+          },
+        });
+        map.addLayer({
+          id: "uv-propagation-labels",
+          type: "symbol",
+          source: "uv-propagation",
+          layout: {
+            "symbol-placement": "line-center",
+            "text-field": ["get", "label"],
+            "text-size": 11,
+            "text-font": ["Noto Sans Regular"],
+          },
+          paint: {
+            "text-color": [
+              "case",
+              ["<", ["get", "delta"], 0], "#86efac",
+              ["<", ["get", "delta"], 15], "#fdba74",
+              "#fca5a5",
+            ],
+            "text-halo-color": "#0b1220",
+            "text-halo-width": 1.6,
+          },
+        });
+
         setReady(true);
       });
 
