@@ -413,6 +413,28 @@ export function MapboxMap({
     }
   }, [overlay, ready, center]);
 
+  // Toggle POI layer visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const vis = showPois ? "visible" : "none";
+    if (map.getLayer("uv-pois-circles")) map.setLayoutProperty("uv-pois-circles", "visibility", vis);
+    if (map.getLayer("uv-pois-labels")) map.setLayoutProperty("uv-pois-labels", "visibility", vis);
+  }, [showPois, ready]);
+
+  // Cross-component fly-to bus (AI Planner → map)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const d = (e as CustomEvent<FlyToDetail>).detail;
+      if (!d) return;
+      map.flyTo({ center: [d.lng, d.lat], zoom: d.zoom ?? 14.5, speed: 1.2 });
+    };
+    window.addEventListener("uv:flyTo", handler);
+    return () => window.removeEventListener("uv:flyTo", handler);
+  }, []);
+
   return <div ref={containerRef} className="absolute inset-0" />;
 }
 
