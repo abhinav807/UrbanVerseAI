@@ -593,6 +593,89 @@ export function MapboxMap({
     return () => window.removeEventListener("uv:flyTo", handler);
   }, []);
 
+  // Emergency layer visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const vis = emergencyLayer ? "visible" : "none";
+    ["uv-emergency-halo", "uv-emergency-circles", "uv-emergency-labels"].forEach((id) => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+    });
+  }, [emergencyLayer, ready]);
+
+  // Propagation overlay
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const src = map.getSource("uv-propagation") as maplibregl.GeoJSONSource | undefined;
+    src?.setData(propagationFC ?? emptyFC);
+  }, [propagationFC, ready]);
+
+  // Animated dasharray for propagation lines
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    let step = 0;
+    const id = window.setInterval(() => {
+      step = (step + 1) % 8;
+      if (map.getLayer("uv-propagation-lines")) {
+        try {
+          map.setPaintProperty("uv-propagation-lines", "line-dasharray", [2, 2 + (step % 4) * 0.5]);
+        } catch { /* noop */ }
+      }
+    }, 220);
+    return () => window.clearInterval(id);
+  }, [ready]);
+
+  // Emergency corridor overlay
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const src = map.getSource("uv-emergency-corridor") as maplibregl.GeoJSONSource | undefined;
+    src?.setData(emergencyCorridorsFC ?? emptyFC);
+  }, [emergencyCorridorsFC, ready]);
+
+  // Horizon → scale traffic overlay intensity (smooth transition)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (!map.getLayer("uv-overlay-traffic")) return;
+    const h = horizonFactors(horizon);
+    try {
+      map.setPaintProperty("uv-overlay-traffic", "line-opacity", Math.min(0.95, 0.55 + (h.trafficMul - 1) * 0.6));
+      map.setPaintProperty("uv-overlay-traffic", "line-width", [
+        "interpolate", ["linear"], ["zoom"],
+        10, 1.2 * h.trafficMul, 14, 3 * h.trafficMul, 18, 6 * h.trafficMul,
+      ]);
+    } catch { /* noop */ }
+  }, [horizon, ready, overlay]);
+
+  // Cross-map sync (compare view)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !syncGroup) return;
+    const me = syncId ?? Math.random().toString(36).slice(2);
+    const applyingRef = { current: false };
+    const onMove = () => {
+      if (applyingRef.current) return;
+      const c = map.getCenter();
+      emitMapSync({ group: syncGroup, lng: c.lng, lat: c.lat, zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(), from: me });
+    };
+    const onSync = (e: Event) => {
+      const d = (e as CustomEvent<MapSyncDetail>).detail;
+      if (!d || d.group !== syncGroup || d.from === me) return;
+      applyingRef.current = true;
+      map.jumpTo({ center: [d.lng, d.lat], zoom: d.zoom, bearing: d.bearing, pitch: d.pitch });
+      window.setTimeout(() => { applyingRef.current = false; }, 16);
+    };
+    map.on("move", onMove);
+    window.addEventListener("uv:mapSync", onSync);
+    return () => {
+      map.off("move", onMove);
+      window.removeEventListener("uv:mapSync", onSync);
+    };
+  }, [syncGroup, syncId, ready]);
+
   return <div ref={containerRef} className="absolute inset-0" />;
 }
 
