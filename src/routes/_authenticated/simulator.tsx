@@ -215,10 +215,20 @@ function Simulator() {
               </div>
             ) : (
               <div className="p-3 space-y-2 overflow-y-auto">
-                <ResultRow label="Traffic" value={`${results.trafficDelta > 0 ? "+" : ""}${results.trafficDelta}%`} status={results.trafficDelta > 0 ? "danger" : "safe"} />
-                <ResultRow label="Congestion" value={`${results.congestionDelta > 0 ? "+" : ""}${results.congestionDelta}%`} status={results.congestionDelta > 0 ? "warn" : "safe"} />
-                <ResultRow label="Emergency delay" value={`${results.emergencyDelay > 0 ? "+" : ""}${results.emergencyDelay} min`} status={results.emergencyDelay > 0.5 ? "danger" : results.emergencyDelay > 0 ? "warn" : "safe"} />
-                <ResultRow label="Population affected" value={results.population.toLocaleString()} status="info" />
+                <ResultRow label="Traffic impact" value={`${results.trafficDelta > 0 ? "+" : ""}${results.trafficDelta}%`} status={results.trafficDelta > 0 ? "danger" : "safe"} />
+                <ResultRow label="Travel time" value={`${results.travelTimeDelta > 0 ? "+" : ""}${results.travelTimeDelta}%`} status={results.travelTimeDelta > 0 ? "warn" : "safe"} />
+                <ResultRow label="Nearby congestion" value={`${results.nearbyCongestion > 0 ? "+" : ""}${results.nearbyCongestion}%`} status={results.nearbyCongestion > 0 ? "warn" : "safe"} />
+                <ResultRow label="Emergency access" value={`${results.emergencyDelay > 0 ? "+" : ""}${results.emergencyDelay} min`} status={results.emergencyDelay > 0.5 ? "danger" : results.emergencyDelay > 0 ? "warn" : "safe"} />
+                <ResultRow label="Population impacted" value={results.population.toLocaleString()} status="info" />
+                <div className="border border-border rounded-md p-2.5 bg-background/40">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Delhi context · within 1.5 km</div>
+                  <div className="grid grid-cols-2 gap-y-1 text-[11px]">
+                    <span className="text-muted-foreground">Road class</span><span className="text-mono text-right">{results.roadClass ?? "—"}</span>
+                    <span className="text-muted-foreground">Metro stations</span><span className="text-mono text-right">{results.context.metros}</span>
+                    <span className="text-muted-foreground">Hospitals</span><span className="text-mono text-right">{results.context.hospitals}</span>
+                    <span className="text-muted-foreground">Schools</span><span className="text-mono text-right">{results.context.schools}</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
