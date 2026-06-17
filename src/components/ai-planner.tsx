@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Send, Sparkles, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PanelHeader } from "@/components/kpi-card";
+import { DecisionReport } from "@/components/decision-report";
 import { emitFlyTo, resolveDelhiLocation } from "@/lib/delhi-data";
+import { computeImpact, type ImpactReport } from "@/lib/sim-engine";
 
 type Msg = { from: "ai" | "user"; text: string };
 
@@ -10,7 +12,7 @@ const seedMessages: Msg[] = [
   {
     from: "ai",
     text:
-      "Namaste. Overnight telemetry from Delhi corridors is in — congestion on NH-48 (Delhi–Gurugram) is up 9% vs the 7-day baseline. Should I model a diversion via the Outer Ring Road?",
+      "Namaste. Overnight telemetry from Delhi corridors is in — congestion on NH-48 (Delhi–Gurugram) is up 9% vs the 7-day baseline. Ask me to simulate any closure, repair, or new corridor and I'll generate a full decision report.",
   },
 ];
 
@@ -22,9 +24,19 @@ const suggestions = [
   "Assess infrastructure stress at Ghazipur",
 ];
 
+function inferAction(text: string): "block" | "extend" | "repair" | "build" {
+  const t = text.toLowerCase();
+  if (/(close|closure|block|shut)/.test(t)) return "block";
+  if (/(repair|fix|resurface|maintain)/.test(t)) return "repair";
+  if (/(extend|widen|expand)/.test(t)) return "extend";
+  if (/(build|new road|construct|corridor)/.test(t)) return "build";
+  return "block";
+}
+
 export function AIPlanner() {
   const [messages, setMessages] = useState<Msg[]>(seedMessages);
   const [input, setInput] = useState("");
+  const [report, setReport] = useState<ImpactReport | null>(null);
 
   const send = (text: string) => {
     if (!text.trim()) return;
@@ -34,18 +46,21 @@ export function AIPlanner() {
     const loc = resolveDelhiLocation(text);
     if (loc) emitFlyTo({ lng: loc.lng, lat: loc.lat, zoom: 14.8, label: loc.name });
 
+    const action = inferAction(text);
+    const r = loc ? computeImpact({ lng: loc.lng, lat: loc.lat }, action, "now", null) : null;
+    setReport(r);
+
     setTimeout(() => {
-      const where = loc ? loc.name : "the selected corridor";
       setMessages((m) => [
         ...m,
         {
           from: "ai",
-          text: loc
-            ? `Centred the atlas on ${where}. Running the scenario across nearby road class, intersection density, metro proximity, and hospital access. Projected outcome: −7.4% peak congestion, +1.8 min avg emergency response, ~38k residents impacted within a 1.5 km radius. Generate full assessment?`
-            : `Could not match a Delhi location in that prompt — try a landmark like "AIIMS", "Saket", or "Anand Vihar". I'll still model the generic scenario: −6% peak congestion, ~42k residents impacted.`,
+          text: r && loc
+            ? `Centred on ${loc.name}. Modelled a ${action.toUpperCase()} scenario across nearby roads, metros, hospitals and floodplain proximity. Decision score ${r.decisionScore}/100 · status ${r.decisionStatus}. Full assessment below.`
+            : `Could not match a Delhi location in that prompt — try a landmark like "AIIMS", "Saket", or "Anand Vihar".`,
         },
       ]);
-    }, 650);
+    }, 450);
   };
 
   return (
@@ -78,6 +93,15 @@ export function AIPlanner() {
             {m.text}
           </div>
         ))}
+
+        {report && (
+          <div className="border border-primary/30 rounded-md bg-background/60">
+            <div className="px-2.5 py-1.5 border-b border-border text-[10px] uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <Sparkles className="size-3" /> Decision report
+            </div>
+            <DecisionReport r={report} />
+          </div>
+        )}
       </div>
 
       <div className="px-3 pb-2 space-y-1">

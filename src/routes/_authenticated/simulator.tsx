@@ -8,7 +8,7 @@ import { DecisionReport } from "@/components/decision-report";
 import { Button } from "@/components/ui/button";
 import {
   Ban, MoveRight, Wrench, Plus, Play, RotateCcw,
-  Activity, Flame, Droplets, EyeOff, MapPin, Siren,
+  Activity, Flame, Droplets, EyeOff, MapPin, Siren, Columns2,
 } from "lucide-react";
 import { createSimulation } from "@/lib/api/crud";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ function Simulator() {
   const [drawMode, setDrawMode] = useState<"none" | "road" | "route">("none");
   const [emergencyLayer, setEmergencyLayer] = useState(true);
   const [horizon, setHorizon] = useState<HorizonKey>("now");
+  const [compare, setCompare] = useState(false);
   const [selection, setSelection] = useState<{ count: number; lastClicked: RoadFeatureInfo | null }>({
     count: 0,
     lastClicked: null,
@@ -64,7 +65,6 @@ function Simulator() {
           selectedCount: selection.count,
           lastClicked: selection.lastClicked,
           drawn: drawnFeatures,
-          horizon,
           ...report,
         },
       });
@@ -111,6 +111,14 @@ function Simulator() {
             <> · <span className="text-foreground">{drawnFeatures.length}</span> drawn</>
           )}
         </div>
+        <Button
+          variant={compare ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setCompare((v) => !v)}
+          className={compare ? "bg-primary/15 border border-primary/50 text-foreground hover:bg-primary/20" : ""}
+        >
+          <Columns2 className="size-3.5 mr-1.5" /> {compare ? "Single View" : "Compare"}
+        </Button>
         <Button variant="ghost" size="sm" onClick={reset}>
           <RotateCcw className="size-3.5 mr-1.5" /> Reset
         </Button>
@@ -138,17 +146,54 @@ function Simulator() {
             <TimelineSlider value={horizon} onChange={setHorizon} />
           </div>
 
-          <MapboxMap
-            key={mapKey}
-            overlay={overlay}
-            drawMode={drawMode}
-            onSelectionChange={setSelection}
-            onDrawCreate={(f) => setDrawnFeatures((prev) => [...prev, f])}
-            horizon={horizon}
-            emergencyLayer={emergencyLayer}
-            propagationFC={propagationFC}
-            emergencyCorridorsFC={corridorsFC}
-          />
+          {compare ? (
+            <div className="absolute inset-0 grid grid-cols-2 gap-0.5 bg-border">
+              <div className="relative bg-panel">
+                <div className="absolute z-10 top-3 left-3 panel-surface rounded px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Before · Present day
+                </div>
+                <MapboxMap
+                  key={`L-${mapKey}`}
+                  overlay={overlay}
+                  horizon="now"
+                  emergencyLayer={false}
+                  syncGroup={`sim-${mapKey}`}
+                  syncId="left"
+                  interactive={false}
+                />
+              </div>
+              <div className="relative bg-panel">
+                <div className="absolute z-10 top-3 left-3 panel-surface rounded px-2 py-1 text-[10px] uppercase tracking-wider text-primary">
+                  After · {horizon === "now" ? "Scenario" : horizon}
+                </div>
+                <MapboxMap
+                  key={`R-${mapKey}`}
+                  overlay={overlay}
+                  drawMode={drawMode}
+                  onSelectionChange={setSelection}
+                  onDrawCreate={(f) => setDrawnFeatures((prev) => [...prev, f])}
+                  horizon={horizon}
+                  emergencyLayer={emergencyLayer}
+                  propagationFC={propagationFC}
+                  emergencyCorridorsFC={corridorsFC}
+                  syncGroup={`sim-${mapKey}`}
+                  syncId="right"
+                />
+              </div>
+            </div>
+          ) : (
+            <MapboxMap
+              key={mapKey}
+              overlay={overlay}
+              drawMode={drawMode}
+              onSelectionChange={setSelection}
+              onDrawCreate={(f) => setDrawnFeatures((prev) => [...prev, f])}
+              horizon={horizon}
+              emergencyLayer={emergencyLayer}
+              propagationFC={propagationFC}
+              emergencyCorridorsFC={corridorsFC}
+            />
+          )}
         </div>
 
         <div className="basis-1/4 grow-0 shrink-0 flex flex-col gap-2 m-3 ml-1.5 min-h-0">

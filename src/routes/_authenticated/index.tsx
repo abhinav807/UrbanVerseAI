@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { MapboxMap } from "@/components/mapbox-map";
 import { AIPlanner } from "@/components/ai-planner";
 import { KpiCard, PanelHeader } from "@/components/kpi-card";
+import { TimelineSlider } from "@/components/timeline-slider";
+import { horizonFactors, type HorizonKey } from "@/lib/delhi-data";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -14,54 +17,95 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 function Dashboard() {
+  const [horizon, setHorizon] = useState<HorizonKey>("now");
+  const hf = horizonFactors(horizon);
+
+  const kpis = useMemo(() => {
+    const trafficIdx = +(72 * hf.trafficMul).toFixed(1);
+    const floodIdx = +(31 * hf.floodMul).toFixed(0);
+    const emergencyMin = +(7.4 * hf.emergencyMul).toFixed(1);
+    const stressPct = +(86 - (hf.stressMul - 1) * 18).toFixed(1);
+    const popMillions = +(2.1 * hf.popMul).toFixed(2);
+    const urbanHealth = Math.round(
+      100 - (trafficIdx - 60) * 0.3 - (floodIdx - 30) * 0.4 - (emergencyMin - 7) * 1.8 - (100 - stressPct) * 0.4,
+    );
+    return [
+      {
+        label: "Urban Health Score",
+        value: String(Math.max(0, Math.min(100, urbanHealth))),
+        unit: "/ 100",
+        delta: `${horizon === "now" ? "baseline" : `projected ${horizon}`}`,
+        trend: urbanHealth >= 70 ? "up" : "down",
+        status: urbanHealth >= 75 ? "safe" : urbanHealth >= 55 ? "warn" : "danger",
+        spark: [82, 80, 79, 78, 76, 75, 74, 72, 71, urbanHealth].map((v) => Math.max(0, v)),
+      },
+      {
+        label: "Mobility Index · NCR",
+        value: String(trafficIdx),
+        unit: "/ 100",
+        delta: `${horizon === "now" ? "+3.6% vs 24h" : `${((hf.trafficMul - 1) * 100).toFixed(1)}% horizon load`}`,
+        trend: trafficIdx > 72 ? "up" : "flat",
+        status: trafficIdx > 85 ? "danger" : trafficIdx > 70 ? "warn" : "safe",
+        spark: [44, 50, 53, 51, 57, 62, 60, 67, 72, trafficIdx],
+      },
+      {
+        label: "Emergency Readiness",
+        value: String(emergencyMin),
+        unit: "min avg",
+        delta: `${emergencyMin <= 8 ? "Within SLA" : "+" + (emergencyMin - 7.4).toFixed(1) + " min vs base"}`,
+        trend: emergencyMin > 7.4 ? "down" : "up",
+        status: emergencyMin <= 8 ? "safe" : emergencyMin <= 10 ? "warn" : "danger",
+        spark: [7.2, 7.3, 7.3, 7.4, 7.4, 7.5, 7.5, 7.6, 7.7, emergencyMin],
+      },
+      {
+        label: "Yamuna Flood Risk",
+        value: String(floodIdx),
+        unit: "/ 100",
+        delta: `204.1 m · Old Rly Bridge`,
+        trend: floodIdx > 31 ? "up" : "flat",
+        status: floodIdx > 55 ? "danger" : floodIdx > 35 ? "warn" : "info",
+        spark: [18, 19, 21, 24, 26, 28, 27, 29, 30, floodIdx],
+      },
+      {
+        label: "Infrastructure Health",
+        value: String(stressPct),
+        unit: "%",
+        delta: "Ghazipur, Bhalswa pressure",
+        trend: stressPct < 86 ? "down" : "flat",
+        status: stressPct >= 80 ? "info" : stressPct >= 65 ? "warn" : "danger",
+        spark: [92, 91, 91, 90, 89, 88, 88, 87, 87, stressPct],
+      },
+      {
+        label: "Population Pressure",
+        value: `${popMillions}M`,
+        unit: "alert zones",
+        delta: "Yamuna belt + East Delhi",
+        trend: popMillions > 2.1 ? "up" : "flat",
+        status: popMillions > 2.5 ? "danger" : "warn",
+        spark: [1.7, 1.8, 1.85, 1.9, 1.95, 2.0, 2.02, 2.05, 2.08, popMillions].map((v) => v * 100),
+      },
+    ] as const;
+  }, [horizon, hf]);
+
   return (
     <div className="h-full flex">
       <div className="flex-1 flex flex-col min-w-0">
-        {/* KPI strip */}
-        <div className="grid grid-cols-5 gap-2 p-3 border-b border-border bg-background">
-          <KpiCard
-            label="Traffic Index · NCR"
-            value="78.4"
-            unit="/ 100"
-            delta="+3.6% vs 24h"
-            trend="up"
-            status="warn"
-            spark={[44, 50, 53, 51, 57, 62, 60, 67, 72, 78]}
-          />
-          <KpiCard
-            label="Yamuna Flood Risk"
-            value="MOD"
-            delta="204.1 m at Old Rly Bridge"
-            status="warn"
-            spark={[18, 19, 21, 24, 26, 28, 27, 29, 30, 31]}
-          />
-          <KpiCard
-            label="Avg Travel Time"
-            value="34.8"
-            unit="min"
-            delta="+1.4 min"
-            trend="up"
-            status="warn"
-            spark={[28, 29, 30, 31, 32, 32, 33, 33, 34, 34]}
-          />
-          <KpiCard
-            label="Population Impact"
-            value="2.1M"
-            unit="in alert zones"
-            delta="Yamuna belt + East Delhi"
-            trend="up"
-            status="warn"
-            spark={[120, 140, 160, 180, 175, 190, 200, 205, 208, 210]}
-          />
-          <KpiCard
-            label="Infrastructure Health"
-            value="86.4"
-            unit="%"
-            delta="−0.6% (Ghazipur, Bhalswa)"
-            trend="down"
-            status="info"
-            spark={[92, 91, 91, 90, 89, 88, 88, 87, 87, 86]}
-          />
+        {/* Timeline + KPI strip */}
+        <div className="border-b border-border bg-background">
+          <div className="px-3 pt-2.5 pb-1.5 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Operations dashboard · Delhi NCR
+              </div>
+              <div className="text-sm font-medium">Smart City Command — live telemetry</div>
+            </div>
+            <TimelineSlider value={horizon} onChange={setHorizon} />
+          </div>
+          <div className="grid grid-cols-6 gap-2 p-3 pt-1.5">
+            {kpis.map((k) => (
+              <KpiCard key={k.label} {...(k as any)} />
+            ))}
+          </div>
         </div>
 
         {/* Map area */}
@@ -79,7 +123,7 @@ function Dashboard() {
               }
             />
             <div className="flex-1 min-h-0 relative">
-              <MapboxMap overlay="traffic" showPois />
+              <MapboxMap overlay="traffic" showPois horizon={horizon} emergencyLayer />
             </div>
           </div>
 
