@@ -65,7 +65,6 @@ function Simulator() {
           selectedCount: selection.count,
           lastClicked: selection.lastClicked,
           drawn: drawnFeatures,
-          horizon,
           ...report,
         },
       });
