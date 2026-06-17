@@ -49,6 +49,7 @@ export type Database = {
       risk_zones: {
         Row: {
           created_at: string
+          created_by: string | null
           geometry: Json
           id: string
           risk_level: string
@@ -57,6 +58,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           geometry?: Json
           id?: string
           risk_level?: string
@@ -65,6 +67,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           geometry?: Json
           id?: string
           risk_level?: string
@@ -78,6 +81,7 @@ export type Database = {
           capacity: number
           condition: string
           created_at: string
+          created_by: string | null
           geometry: Json
           id: string
           name: string
@@ -88,6 +92,7 @@ export type Database = {
           capacity?: number
           condition?: string
           created_at?: string
+          created_by?: string | null
           geometry?: Json
           id?: string
           name: string
@@ -98,6 +103,7 @@ export type Database = {
           capacity?: number
           condition?: string
           created_at?: string
+          created_by?: string | null
           geometry?: Json
           id?: string
           name?: string
